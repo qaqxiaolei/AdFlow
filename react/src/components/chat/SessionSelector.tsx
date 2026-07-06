@@ -27,25 +27,31 @@ const SessionSelector: React.FC<SessionSelectorProps> = ({
 
   return (
     <div className="flex items-center gap-2 w-full">
-      <Select
-        value={session?.id}
-        onValueChange={(value) => {
-          onSelectSession(value)
-        }}
-      >
-        <SelectTrigger className="flex-1 min-w-0 bg-background">
-          <SelectValue placeholder="Theme" />
-        </SelectTrigger>
-        <SelectContent>
-          {sessionList
-            ?.filter((session) => session.id && session.id.trim() !== '') // Fix error of A ‹Select.Item /> must have a value prop that is not an empty string.
-            ?.map((session) => (
-              <SelectItem key={session.id} value={session.id}>
-                {session.title}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
+      {sessionList && sessionList.length > 0 ? (
+        <Select
+          value={session?.id}
+          onValueChange={(value) => {
+            onSelectSession(value)
+          }}
+        >
+          <SelectTrigger className="flex-1 min-w-0 bg-background">
+            <SelectValue placeholder="Theme" />
+          </SelectTrigger>
+          <SelectContent>
+            {sessionList
+              ?.filter((session) => session.id && session.id.trim() !== '')
+              ?.map((session) => (
+                <SelectItem key={session.id} value={session.id}>
+                  {session.title}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="flex-1 min-w-0 bg-background border border-border rounded-md px-3 py-2 text-muted-foreground text-sm">
+          {t('chat:noChatSessions') || 'No Chat Sessions'}
+        </div>
+      )}
 
       <Button
         variant={'outline'}

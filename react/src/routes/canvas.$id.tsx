@@ -17,7 +17,7 @@ function Canvas() {
     const searchSessionId = search?.sessionId || ''
 
     return (
-        <div className='flex flex-col h-full'>
+        <div className='flex flex-col h-screen'>
             <TopMenu />
             <ChatInterface
                 canvasId={id}

@@ -276,50 +276,56 @@ const ModelSelectorV3: React.FC<ModelSelectorV3Props> = ({
         {/* Models List */}
         <ScrollArea>
           <div className="max-h-80 h-80 px-4 pb-4 select-none">
-            {Object.entries(getCurrentModels()).map(([provider, providerModels], index, array) => {
-              const providerInfo = getProviderDisplayInfo(provider)
-              const isLastGroup = index === array.length - 1
-              return (
-                <DropdownMenuGroup key={provider}>
-                  <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-0 py-2">
-                    <div className="flex items-center gap-2">
-                      <img
-                        src={providerInfo.icon}
-                        alt={providerInfo.name}
-                        className="w-4 h-4 rounded-full"
-                      />
-                      {providerInfo.name}
-                    </div>
-                  </DropdownMenuLabel>
-                  {providerModels.map((model: ModelInfo | ToolInfo) => {
-                    const modelKey = activeTab === 'text'
-                      ? model.provider + ':' + (model as ModelInfo).model
-                      : model.provider + ':' + (model as ToolInfo).id
-                    const modelName = activeTab === 'text'
-                      ? (model as ModelInfo).model
-                      : (model as ToolInfo).display_name || (model as ToolInfo).id
-
-                    return (
-                      <div
-                        key={modelKey}
-                        className="flex items-center justify-between p-3 hover:bg-muted/50 transition-colors mb-2 cursor-pointer"
-                        onClick={() => handleModelClick(modelKey)}
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{modelName}</div>
-                        </div>
-                        <Checkbox
-                          checked={isModelSelected(modelKey)}
-                          className={`ml-4 ${autoMode && activeTab !== 'text' ? 'opacity-50' : ''}`}
-                          disabled={autoMode && activeTab !== 'text'}
+            {Object.keys(getCurrentModels()).length > 0 ? (
+              Object.entries(getCurrentModels()).map(([provider, providerModels], index, array) => {
+                const providerInfo = getProviderDisplayInfo(provider)
+                const isLastGroup = index === array.length - 1
+                return (
+                  <DropdownMenuGroup key={provider}>
+                    <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-0 py-2">
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={providerInfo.icon}
+                          alt={providerInfo.name}
+                          className="w-4 h-4 rounded-full"
                         />
+                        {providerInfo.name}
                       </div>
-                    )
-                  })}
-                  {!isLastGroup && <DropdownMenuSeparator className="my-2" />}
-                </DropdownMenuGroup>
-              )
-            })}
+                    </DropdownMenuLabel>
+                    {providerModels.map((model: ModelInfo | ToolInfo) => {
+                      const modelKey = activeTab === 'text'
+                        ? model.provider + ':' + (model as ModelInfo).model
+                        : model.provider + ':' + (model as ToolInfo).id
+                      const modelName = activeTab === 'text'
+                        ? (model as ModelInfo).model
+                        : (model as ToolInfo).display_name || (model as ToolInfo).id
+
+                      return (
+                        <div
+                          key={modelKey}
+                          className="flex items-center justify-between p-3 hover:bg-muted/50 transition-colors mb-2 cursor-pointer"
+                          onClick={() => handleModelClick(modelKey)}
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{modelName}</div>
+                          </div>
+                          <Checkbox
+                            checked={isModelSelected(modelKey)}
+                            className={`ml-4 ${autoMode && activeTab !== 'text' ? 'opacity-50' : ''}`}
+                            disabled={autoMode && activeTab !== 'text'}
+                          />
+                        </div>
+                      )
+                    })}
+                    {!isLastGroup && <DropdownMenuSeparator className="my-2" />}
+                  </DropdownMenuGroup>
+                )
+              })
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <div className="text-sm">{t('chat:noModelsAvailable') || 'No models available'}</div>
+              </div>
+            )}
           </div>
         </ScrollArea>
       </DropdownMenuContent>

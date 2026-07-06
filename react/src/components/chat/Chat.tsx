@@ -584,21 +584,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     return (
         <PhotoProvider>
-            <div className='flex flex-col h-screen relative'>
-                {/* Chat messages */}
+            <div className='flex flex-col flex-1 relative w-full'>
+                {/* 桌面端卡片式容器 */}
+                <div className='flex flex-col w-full h-full lg:mx-auto lg:w-[80%] lg:h-[calc(100vh-2rem-32px)] lg:rounded-2xl lg:shadow-xl lg:border lg:border-border overflow-hidden'>
+                    {/* Chat messages */}
 
-                <header className='flex items-center px-2 py-2 absolute top-0 z-1 w-full'>
-                    <div className='flex-1 min-w-0'>
-                        <SessionSelector
-                            session={session}
-                            sessionList={sessionList}
-                            onClickNewChat={onClickNewChat}
-                            onSelectSession={onSelectSession}
-                        />
-                    </div>
+                    <header className='flex items-center px-3 py-3 relative z-10 bg-background/80 backdrop-blur-sm border-b border-border/50'>
+                        <div className='flex-1 min-w-0'>
+                            <SessionSelector
+                                session={session}
+                                sessionList={sessionList}
+                                onClickNewChat={onClickNewChat}
+                                onSelectSession={onSelectSession}
+                            />
+                        </div>
 
-                    {/* Share Template Button */}
-                    {/* {authStatus.is_logged_in && (
+                        {/* Share Template Button */}
+                        {/* {authStatus.is_logged_in && (
             <Button
               variant="outline"
               size="sm"
@@ -609,149 +611,150 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </Button>
           )} */}
 
-                    <Blur className='absolute top-0 left-0 right-0 h-full -z-1' />
-                </header>
+                        <Blur className='absolute top-0 left-0 right-0 h-full -z-1' />
+                    </header>
 
-                <ScrollArea className='h-[calc(100vh-45px)]' viewportRef={scrollRef}>
-                    {messages.length > 0 ? (
-                        <div className='flex flex-col flex-1 px-4 pb-50 pt-15'>
-                            {/* Messages */}
-                            {messages.map((message, idx) => (
-                                <div key={`${idx}`} className='flex flex-col gap-4 mb-2'>
-                                    {/* Regular message content */}
-                                    {typeof message.content == 'string' &&
-                                        (message.role !== 'tool' ? (
-                                            <MessageRegular
-                                                message={message}
-                                                content={message.content}
-                                            />
-                                        ) : message.tool_call_id &&
-                                            mergedToolCallIds.current.includes(
-                                                message.tool_call_id
-                                            ) ? (
-                                            <></>
-                                        ) : (
-                                            <ToolCallContent
-                                                expandingToolCalls={expandingToolCalls}
-                                                message={message}
-                                            />
-                                        ))}
-
-                                    {/* 混合内容消息的文本部分 - 显示在聊天框内 */}
-                                    {Array.isArray(message.content) && (
-                                        <>
-                                            <MixedContentImages
-                                                contents={message.content}
-                                            />
-                                            <MixedContentText
-                                                message={message}
-                                                contents={message.content}
-                                            />
-                                        </>
-                                    )}
-
-                                    {message.role === 'assistant' &&
-                                        message.tool_calls &&
-                                        message.tool_calls.at(-1)?.function.name != 'finish' &&
-                                        message.tool_calls.map((toolCall, i) => {
-                                            return (
-                                                <ToolCallTag
-                                                    key={toolCall.id}
-                                                    toolCall={toolCall}
-                                                    isExpanded={expandingToolCalls.includes(toolCall.id)}
-                                                    onToggleExpand={() => {
-                                                        if (expandingToolCalls.includes(toolCall.id)) {
-                                                            setExpandingToolCalls((prev) =>
-                                                                prev.filter((id) => id !== toolCall.id)
-                                                            )
-                                                        } else {
-                                                            setExpandingToolCalls((prev) => [
-                                                                ...prev,
-                                                                toolCall.id,
-                                                            ])
-                                                        }
-                                                    }}
-                                                    requiresConfirmation={pendingToolConfirmations.includes(
-                                                        toolCall.id
-                                                    )}
-                                                    onConfirm={() => {
-                                                        // 发送确认事件到后端
-                                                        fetch('/api/tool_confirmation', {
-                                                            method: 'POST',
-                                                            headers: {
-                                                                'Content-Type': 'application/json',
-                                                            },
-                                                            body: JSON.stringify({
-                                                                session_id: sessionId,
-                                                                tool_call_id: toolCall.id,
-                                                                confirmed: true,
-                                                            }),
-                                                        })
-                                                    }}
-                                                    onCancel={() => {
-                                                        // 发送取消事件到后端
-                                                        fetch('/api/tool_confirmation', {
-                                                            method: 'POST',
-                                                            headers: {
-                                                                'Content-Type': 'application/json',
-                                                            },
-                                                            body: JSON.stringify({
-                                                                session_id: sessionId,
-                                                                tool_call_id: toolCall.id,
-                                                                confirmed: false,
-                                                            }),
-                                                        })
-                                                    }}
+                    <ScrollArea className='flex-1 min-h-0' viewportRef={scrollRef}>
+                        {messages.length > 0 ? (
+                            <div className='flex flex-col flex-1 px-4 py-4'>
+                                {/* Messages */}
+                                {messages.map((message, idx) => (
+                                    <div key={`${idx}`} className='flex flex-col gap-4 mb-2'>
+                                        {/* Regular message content */}
+                                        {typeof message.content == 'string' &&
+                                            (message.role !== 'tool' ? (
+                                                <MessageRegular
+                                                    message={message}
+                                                    content={message.content}
                                                 />
-                                            )
-                                        })}
-                                </div>
-                            ))}
-                            {pending && <ChatSpinner pending={pending} />}
-                            {pending && sessionId && (
-                                <ToolcallProgressUpdate sessionId={sessionId} />
-                            )}
-                        </div>
-                    ) : (
-                        <motion.div className='flex flex-col h-full p-4 items-start justify-start pt-16 select-none'>
-                            <motion.span
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.5 }}
-                                className='text-muted-foreground text-3xl'
-                            >
-                                <ShinyText text='Hello, Jaaz!' />
-                            </motion.span>
-                            <motion.span
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.6 }}
-                                className='text-muted-foreground text-2xl'
-                            >
-                                <ShinyText text='How can I help you today?' />
-                            </motion.span>
-                        </motion.div>
-                    )}
-                </ScrollArea>
+                                            ) : message.tool_call_id &&
+                                                mergedToolCallIds.current.includes(
+                                                    message.tool_call_id
+                                                ) ? (
+                                                <></>
+                                            ) : (
+                                                <ToolCallContent
+                                                    expandingToolCalls={expandingToolCalls}
+                                                    message={message}
+                                                />
+                                            ))}
 
-                <div className='p-2 gap-2 sticky bottom-0'>
-                    <ChatTextarea
-                        sessionId={sessionId!}
-                        pending={!!pending}
-                        messages={messages}
-                        onSendMessages={onSendMessages}
-                        onCancelChat={handleCancelChat}
-                    />
+                                        {/* 混合内容消息的文本部分 - 显示在聊天框内 */}
+                                        {Array.isArray(message.content) && (
+                                            <>
+                                                <MixedContentImages
+                                                    contents={message.content}
+                                                />
+                                                <MixedContentText
+                                                    message={message}
+                                                    contents={message.content}
+                                                />
+                                            </>
+                                        )}
 
-                    {/* 魔法生成组件 */}
-                    <ChatMagicGenerator
-                        sessionId={sessionId || ''}
-                        canvasId={canvasId}
-                        messages={messages}
-                        setMessages={setMessages}
-                        setPending={setPending}
-                        scrollToBottom={scrollToBottom}
-                    />
+                                        {message.role === 'assistant' &&
+                                            message.tool_calls &&
+                                            message.tool_calls.at(-1)?.function.name != 'finish' &&
+                                            message.tool_calls.map((toolCall, i) => {
+                                                return (
+                                                    <ToolCallTag
+                                                        key={toolCall.id}
+                                                        toolCall={toolCall}
+                                                        isExpanded={expandingToolCalls.includes(toolCall.id)}
+                                                        onToggleExpand={() => {
+                                                            if (expandingToolCalls.includes(toolCall.id)) {
+                                                                setExpandingToolCalls((prev) =>
+                                                                    prev.filter((id) => id !== toolCall.id)
+                                                                )
+                                                            } else {
+                                                                setExpandingToolCalls((prev) => [
+                                                                    ...prev,
+                                                                    toolCall.id,
+                                                                ])
+                                                            }
+                                                        }}
+                                                        requiresConfirmation={pendingToolConfirmations.includes(
+                                                            toolCall.id
+                                                        )}
+                                                        onConfirm={() => {
+                                                            // 发送确认事件到后端
+                                                            fetch('/api/tool_confirmation', {
+                                                                method: 'POST',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json',
+                                                                },
+                                                                body: JSON.stringify({
+                                                                    session_id: sessionId,
+                                                                    tool_call_id: toolCall.id,
+                                                                    confirmed: true,
+                                                                }),
+                                                            })
+                                                        }}
+                                                        onCancel={() => {
+                                                            // 发送取消事件到后端
+                                                            fetch('/api/tool_confirmation', {
+                                                                method: 'POST',
+                                                                headers: {
+                                                                    'Content-Type': 'application/json',
+                                                                },
+                                                                body: JSON.stringify({
+                                                                    session_id: sessionId,
+                                                                    tool_call_id: toolCall.id,
+                                                                    confirmed: false,
+                                                                }),
+                                                            })
+                                                        }}
+                                                    />
+                                                )
+                                            })}
+                                    </div>
+                                ))}
+                                {pending && <ChatSpinner pending={pending} />}
+                                {pending && sessionId && (
+                                    <ToolcallProgressUpdate sessionId={sessionId} />
+                                )}
+                            </div>
+                        ) : (
+                            <motion.div className='flex flex-col h-full p-6 items-center justify-center select-none'>
+                                <motion.span
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                    className='text-muted-foreground text-2xl lg:text-3xl'
+                                >
+                                    <ShinyText text='Hello, Restaurant Owner!' />
+                                </motion.span>
+                                <motion.span
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.6 }}
+                                    className='text-muted-foreground text-lg lg:text-xl mt-2'
+                                >
+                                    <ShinyText text='How can I help you today?' />
+                                </motion.span>
+                            </motion.div>
+                        )}
+                    </ScrollArea>
+
+                    <div className='relative p-3 gap-3 bg-background border-t border-border z-50'>
+                        <ChatTextarea
+                            sessionId={sessionId!}
+                            pending={!!pending}
+                            messages={messages}
+                            onSendMessages={onSendMessages}
+                            onCancelChat={handleCancelChat}
+                        />
+
+                        {/* 魔法生成组件 */}
+                        <ChatMagicGenerator
+                            sessionId={sessionId || ''}
+                            canvasId={canvasId}
+                            messages={messages}
+                            setMessages={setMessages}
+                            setPending={setPending}
+                            scrollToBottom={scrollToBottom}
+                        />
+                    </div>
                 </div>
             </div>
         </PhotoProvider>

@@ -107,36 +107,42 @@ const ModelSelector: React.FC = () => {
 
   return (
     <>
-      <Select
-        value={textModel?.provider + ':' + textModel?.model}
-        onValueChange={(value) => {
-          localStorage.setItem('text_model', value)
-          setTextModel(
-            textModels?.find((m) => m.provider + ':' + m.model == value)
-          )
-        }}
-      >
-        <SelectTrigger className="w-fit max-w-[100px] bg-background" size="sm">
-          <SelectValue placeholder="Theme" />
-        </SelectTrigger>
-        <SelectContent>
-          {Object.entries(groupedLLMs).map(([provider, models]) => {
-            return (
-              <SelectGroup key={provider}>
-                <SelectLabel>{provider}</SelectLabel>
-                {models.map((model) => (
-                  <SelectItem
-                    key={model.provider + ':' + model.model}
-                    value={model.provider + ':' + model.model}
-                  >
-                    {model.model}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
+      {textModels && textModels.length > 0 ? (
+        <Select
+          value={textModel?.provider + ':' + textModel?.model}
+          onValueChange={(value) => {
+            localStorage.setItem('text_model', value)
+            setTextModel(
+              textModels?.find((m) => m.provider + ':' + m.model == value)
             )
-          })}
-        </SelectContent>
-      </Select>
+          }}
+        >
+          <SelectTrigger className="w-fit max-w-[100px] bg-background" size="sm">
+            <SelectValue placeholder="Theme" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(groupedLLMs).map(([provider, models]) => {
+              return (
+                <SelectGroup key={provider}>
+                  <SelectLabel>{provider}</SelectLabel>
+                  {models.map((model) => (
+                    <SelectItem
+                      key={model.provider + ':' + model.model}
+                      value={model.provider + ':' + model.model}
+                    >
+                      {model.model}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )
+            })}
+          </SelectContent>
+        </Select>
+      ) : (
+        <div className="w-fit max-w-[100px] bg-background border border-border rounded-md px-3 py-2 text-muted-foreground text-sm">
+          {t('chat:noModels') || 'No Models'}
+        </div>
+      )}
 
       {/* 多选图像模型下拉菜单 */}
       <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>

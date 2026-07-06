@@ -78,8 +78,8 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }[]
   >([])
   const [isFocused, setIsFocused] = useState(false)
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>('auto')
-  const [quantity, setQuantity] = useState<number>(1)
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>('9:16')
+  const [quantity, setQuantity] = useState<number>(2)
   const [showQuantitySlider, setShowQuantitySlider] = useState(false)
   const quantitySliderRef = useRef<HTMLDivElement>(null)
   const MAX_QUANTITY = 30
