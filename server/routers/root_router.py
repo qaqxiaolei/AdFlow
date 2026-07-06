@@ -29,7 +29,7 @@ def get_ollama_model_list() -> List[str]:
 
 
 async def get_comfyui_model_list(base_url: str) -> List[str]:
-    """Get ComfyUI model list from object_info API"""
+    """从object_info API获取ComfyUI模型列表"""
     try:
         timeout = httpx.Timeout(10.0)
         async with HttpClient.create(timeout=timeout) as client:

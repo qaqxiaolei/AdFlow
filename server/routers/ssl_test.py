@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api")
 
 
 async def quick_ssl_test():
-    """Quick SSL test for API endpoint"""
+    """快速测试API端点的SSL连接"""
     try:
         async with HttpClient.create() as client:
             response = await client.get('https://httpbin.org/get', timeout=5)
@@ -49,7 +49,7 @@ async def quick_ssl_test():
 
 @router.get("/test_ssl")
 async def test_ssl_endpoint():
-    """API endpoint to test SSL configuration"""
+    """测试SSL配置的API端点"""
     try:
         result = await quick_ssl_test()
         return result
@@ -62,7 +62,7 @@ async def test_ssl_endpoint():
 
 
 async def test_ssl_configuration():
-    """Run comprehensive SSL tests"""
+    """运行全面的SSL测试"""
     test_results = []
     is_bundled = getattr(sys, 'frozen', False)
 
@@ -264,7 +264,7 @@ async def test_ssl_configuration():
 
 @router.get("/test_ssl_full")
 async def test_ssl_full_endpoint():
-    """API endpoint to run full SSL tests"""
+    """运行完整SSL测试的API端点"""
     try:
         result = await test_ssl_configuration()
         return result
@@ -277,7 +277,7 @@ async def test_ssl_full_endpoint():
 
 @router.get("/ssl_status")
 async def ssl_status_endpoint():
-    """Get SSL configuration status without running network tests"""
+    """获取SSL配置状态（不运行网络测试）"""
     try:
         import ssl
         import certifi

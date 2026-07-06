@@ -1,6 +1,6 @@
 """
-Canvas-related utilities for image generation
-Handles canvas operations, locking, and notifications
+图像生成相关的画布工具
+处理画布操作、锁定和通知
 """
 
 import asyncio
@@ -16,12 +16,12 @@ from services.websocket_service import send_to_websocket
 from utils.canvas import find_next_best_element_position
 
 def generate_file_id() -> str:
-    """Generate unique file ID"""
+    """生成唯一文件ID"""
     return 'im_' + generate(size=8)
 
 
 class CanvasLockManager:
-    """Canvas lock manager to prevent concurrent operations causing position overlap"""
+    """画布锁管理器，防止并发操作导致位置重叠"""
 
     def __init__(self) -> None:
         self._locks: Dict[str, asyncio.Lock] = {}
@@ -46,7 +46,7 @@ async def generate_new_image_element(
     image_data: Dict[str, Any],
     canvas_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Generate new image element for canvas"""
+    """为画布生成新的图像元素"""
     if canvas_data is None:
         canvas = await db_service.get_canvas_data(canvas_id)
         if canvas is None:
@@ -92,7 +92,7 @@ async def generate_new_image_element(
 
 
 async def save_image_to_canvas(session_id: str, canvas_id: str, filename: str, mime_type: str, width: int, height: int) -> str:
-    """Save image to canvas with proper locking and positioning"""
+    """使用正确的锁定和定位将图像保存到画布"""
     # Use lock to ensure atomicity of the save process
     async with canvas_lock_manager.lock_canvas(canvas_id):
         # Fetch canvas data once inside the lock
@@ -149,7 +149,7 @@ async def save_image_to_canvas(session_id: str, canvas_id: str, filename: str, m
 
 
 async def send_image_start_notification(session_id: str, message: str) -> None:
-    """Send image generation start notification"""
+    """发送图像生成开始通知"""
     await send_to_websocket(session_id, {
         'type': 'image_generation_start',
         'message': message
@@ -157,7 +157,7 @@ async def send_image_start_notification(session_id: str, message: str) -> None:
 
 
 async def send_image_error_notification(session_id: str, error_message: str) -> None:
-    """Send image generation error notification"""
+    """发送图像生成错误通知"""
     await send_to_websocket(session_id, {
         'type': 'error',
         'error': error_message

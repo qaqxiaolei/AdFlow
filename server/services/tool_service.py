@@ -31,6 +31,7 @@ from tools.generate_image_by_recraft_v3_replicate import (
 )
 from tools.generate_image_by_agnes import generate_image_by_agnes
 from tools.generate_video_by_agnes import generate_video_by_agnes
+from tools.search_video_by_platform import search_video_by_platform_tool
 from services.config_service import config_service
 from services.db_service import db_service
 
@@ -101,6 +102,12 @@ TOOL_MAPPING: Dict[str, ToolInfo] = {
         "provider": "replicate",
         "tool_function": generate_image_by_flux_kontext_max_replicate,
     },
+    "search_video_by_platform": {
+        "display_name": "Video Search",
+        "type": "search",
+        "provider": "system",
+        "tool_function": search_video_by_platform_tool,
+    },
 }
 
 
@@ -117,6 +124,16 @@ class ToolService:
             }
         except ImportError as e:
             print(f"❌ 注册必须工具失败 write_plan: {e}")
+
+        try:
+            self.tools["search_video_by_platform"] = {
+                "provider": "system",
+                "tool_function": search_video_by_platform_tool,
+                "display_name": "Video Search",
+                "type": "search",
+            }
+        except ImportError as e:
+            print(f"❌ 注册必须工具失败 search_video_by_platform: {e}")
 
     def register_tool(self, tool_id: str, tool_info: ToolInfo):
         if tool_id in self.tools:

@@ -161,11 +161,12 @@ class JaazService:
         Raises:
             Exception: 当任务失败或超时时抛出异常
         """
-        max_attempts = max_attempts or 150  # 默认最多轮询 150 次
-        interval = interval or 2.0  # 默认轮询间隔 2 秒
+        max_attempts = max_attempts or 60
+        initial_interval = interval or 2.0
+        max_interval = 15.0
 
         async with HttpClient.create_aiohttp() as session:
-            for _ in range(max_attempts):
+            for attempt in range(max_attempts):
                 async with session.get(
                     f"{self.api_url}/task/{task_id}",
                     headers=self._build_headers(),
@@ -177,7 +178,7 @@ class JaazService:
                             task = data['data']['task']
                             status = task.get('status')
 
-                            if status == 'succeeded':
+                            if status in ('succeeded', 'completed'):
                                 print(
                                     f"✅ Task {task_id} completed successfully")
                                 return task
@@ -187,13 +188,19 @@ class JaazService:
                             elif status == 'cancelled':
                                 raise Exception("Task was cancelled")
                             elif status == 'processing':
-                                # 继续轮询
-                                await asyncio.sleep(interval)
+                                current_interval = min(initial_interval * (1.5 ** attempt), max_interval)
+                                print(f"🎥 Task {task_id} still {status}, next poll in {current_interval:.1f}s")
+                                await asyncio.sleep(current_interval)
                                 continue
                             else:
                                 raise Exception(f"Unknown task status: {status}")
                         else:
                             raise Exception("Task not found")
+                    elif response.status == 429:
+                        current_interval = min(initial_interval * (2 ** attempt), max_interval)
+                        print(f"🎥 Polling rate limited, waiting {current_interval} seconds...")
+                        await asyncio.sleep(current_interval)
+                        continue
                     else:
                         raise Exception(f"Failed to get task status: HTTP {response.status}")
 

@@ -20,7 +20,7 @@ class GenerateImageByGptImage1InputSchema(BaseModel):
 
 
 @tool("generate_image_by_gpt_image_1_jaaz",
-      description="Generate an image by gpt image model using text prompt or optionally pass images for reference or for editing. Use this model if you need to use multiple input images as reference. Supports multiple providers with automatic fallback.",
+      description="使用 GPT Image 模型通过文本提示生成图像，或可选地传递图像作为参考或编辑。如果需要使用多个输入图像作为参考，请使用此模型。支持多个提供商自动降级。提示词必须使用中文。",
       args_schema=GenerateImageByGptImage1InputSchema)
 async def generate_image_by_gpt_image_1_jaaz(
     prompt: str,

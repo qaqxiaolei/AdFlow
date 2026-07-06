@@ -9,11 +9,11 @@ async def generate_image_by_agnes(
     aspect_ratio: Optional[str] = "1:1",
 ) -> str:
     """
-    Generate images using Agnes AI image model.
+    使用 Agnes AI 图像模型生成图片。
 
-    Args:
-        prompt: Image generation prompt
-        aspect_ratio: Image aspect ratio, options: 1:1, 16:9, 9:16, 4:3, 3:4
+    参数:
+        prompt: 图像生成提示词（必须使用中文）
+        aspect_ratio: 图像宽高比，可选值: 1:1, 16:9, 9:16, 4:3, 3:4
     """
     return await generate_image_with_provider(
         canvas_id="",

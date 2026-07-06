@@ -13,14 +13,14 @@ from routers.comfyui_execution import execute
 
 
 class ComfyUIResponse(BaseModel):
-    """ComfyUI API response format"""
+    """ComfyUI API响应格式"""
     outputs: list[str]
     status: str
 
 
 def get_asset_path(filename: str) -> str:
     """
-    To get the correct path for pyinstaller bundled application
+    获取pyinstaller打包应用的正确路径
     """
     if getattr(sys, "frozen", False):
         # If the application is run as a bundle, the path is relative to the executable
@@ -35,10 +35,10 @@ def get_asset_path(filename: str) -> str:
 
 
 class ComfyUIProvider(ImageProviderBase, provider_name="comfyui"):
-    """ComfyUI image generation provider implementation"""
+    """ComfyUI图像生成提供商实现"""
 
     def __init__(self):
-        # Load workflows
+        # 加载工作流
         asset_dir = get_asset_path("flux_comfy_workflow.json")
         basic_comfy_t2i_workflow = get_asset_path(
             "default_comfy_t2i_workflow.json")
@@ -55,7 +55,7 @@ class ComfyUIProvider(ImageProviderBase, provider_name="comfyui"):
             traceback.print_exc()
 
     def _calculate_dimensions(self, aspect_ratio: str, model: str) -> tuple[int, int]:
-        """Calculate width and height based on aspect ratio and model"""
+        """根据宽高比和模型计算宽度和高度"""
         if "flux" in model:
             # Flux generate images around 1M pixel (1024x1024)
             pixel_count = 1024**2
@@ -72,7 +72,7 @@ class ComfyUIProvider(ImageProviderBase, provider_name="comfyui"):
         return width, height
 
     def _build_workflow(self, prompt: str, model: str, width: int, height: int) -> dict[str, Any]:
-        """Build workflow based on model type"""
+        """根据模型类型构建工作流"""
         if "flux" in model:
             if not self.flux_comfy_workflow:
                 raise FileNotFoundError("Flux workflow json not found")

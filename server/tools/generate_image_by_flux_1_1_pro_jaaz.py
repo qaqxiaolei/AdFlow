@@ -16,7 +16,7 @@ class GenerateImageByFlux11ProInputSchema(BaseModel):
 
 
 @tool("generate_image_by_flux_1_1_pro",
-      description="Generate an image by Flux 1.1 Pro model using text prompt. This model does NOT support input images for reference or editing. Use this model for high-quality image generation with Flux's advanced AI. Supports multiple providers with automatic fallback.",
+      description="使用 Flux 1.1 Pro 模型通过文本提示生成图像。该模型不支持输入图像作为参考或编辑。使用此模型进行高质量图像生成。支持多个提供商自动降级。提示词必须使用中文。",
       args_schema=GenerateImageByFlux11ProInputSchema)
 async def generate_image_by_flux_1_1_pro(
     prompt: str,

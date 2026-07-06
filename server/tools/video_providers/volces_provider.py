@@ -9,7 +9,7 @@ from services.config_service import config_service
 
 
 class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
-    """Volces Cloud video generation provider implementation"""
+    """Volces云视频生成提供商实现"""
 
     def __init__(self):
         config = config_service.app_config.get('volces', {})
@@ -18,16 +18,16 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
         self.model_name = config.get("model_name", "doubao-seedance-1-0-pro")
 
         if not self.api_key:
-            raise ValueError("Volces API key is not configured")
+            raise ValueError("Volces API密钥未配置")
         if not self.base_url:
-            raise ValueError("Volces URL is not configured")
+            raise ValueError("Volces URL未配置")
 
     def _build_api_url(self) -> str:
-        """Build API URL for Volces Cloud"""
+        """构建Volces云的API URL"""
         return f"{self.base_url}/contents/generations/tasks"
 
     def _build_headers(self) -> Dict[str, str]:
-        """Build request headers"""
+        """构建请求头"""
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -44,7 +44,7 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
         input_image_data: Optional[str] | None = None,
         **kwargs: Any
     ) -> Dict[str, Any]:
-        """Build request payload for Volces API"""
+        """构建Volces API的请求载荷"""
         # Build command string
         command = (
             f"--resolution {resolution} "
@@ -88,12 +88,12 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
         return payload
 
     async def _poll_task_status(self, task_id: str, headers: Dict[str, str]) -> str:
-        """Poll task status until completion"""
+        """轮询任务状态直到完成"""
         polling_url = f"{self.base_url}/contents/generations/tasks/{task_id}"
         status = "submitted"
 
         async with HttpClient.create_aiohttp() as session:
-            while status not in ("succeeded", "failed", "cancelled"):
+            while status not in ("succeeded", "completed", "failed", "cancelled"):
                 print(
                     f"🎥 Polling Volces generation {task_id}, current status: {status} ...")
                 await asyncio.sleep(3)  # Wait 3 seconds between polls
@@ -102,7 +102,7 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
                     poll_res = await poll_response.json()
                     status = poll_res.get("status", None)
 
-                    if status == "succeeded":
+                    if status in ("succeeded", "completed"):
                         output = poll_res.get(
                             "content", {}).get("video_url", None)
                         if output and isinstance(output, str):

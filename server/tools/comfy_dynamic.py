@@ -44,7 +44,7 @@ from tools.video_generation.video_canvas_utils import generate_new_video_element
 
 
 def _python_type(param_type: str, default: Any):
-    """Map simple param types to Python types."""
+    """将简单参数类型映射到Python类型。"""
     if param_type == "number":
         # choose int vs float based on default value presence
         if isinstance(default, int):
@@ -58,8 +58,8 @@ def _python_type(param_type: str, default: Any):
 
 def _build_input_schema(wf: Dict[str, Any]) -> type[BaseModel]:
     """
-    Build a Pydantic model named '<WorkflowName>Input' from workflow['inputs'].
-    The `inputs` column is stored in DB as JSON text -> parse first.
+    从workflow['inputs']构建名为'<WorkflowName>Input'的Pydantic模型。
+    `inputs`列在数据库中存储为JSON文本，需要先解析。
     """
     try:
         input_defs: List[Dict[str, Any]] = (
@@ -99,7 +99,7 @@ def _build_input_schema(wf: Dict[str, Any]) -> type[BaseModel]:
 
 
 def build_tool(wf: Dict[str, Any]) -> BaseTool:
-    """Return an @tool function for the given workflow record."""
+    """为给定的工作流记录返回一个@tool函数。"""
     input_schema = _build_input_schema(wf)
 
     @tool(

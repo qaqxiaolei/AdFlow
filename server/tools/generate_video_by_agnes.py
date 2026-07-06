@@ -20,7 +20,7 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
     )
     aspect_ratio: str = Field(
         default="16:9",
-        description="Optional. The aspect ratio of the video. Allowed values: 1:1, 16:9, 4:3, 21:9"
+        description="Optional. The aspect ratio of the video. Allowed values: 1:1, 16:9, 9:16, 4:3, 21:9"
     )
     input_images: list[str] | None = Field(
         default=None,
@@ -30,7 +30,7 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
 
 
 @tool("generate_video_by_agnes",
-      description="Generate videos using Agnes AI video model.",
+      description="使用 Agnes AI 视频模型生成视频。提示词必须使用中文。",
       args_schema=GenerateVideoByAgnesInputSchema)
 async def generate_video_by_agnes(
     prompt: str,
@@ -43,14 +43,18 @@ async def generate_video_by_agnes(
 ) -> str:
     processed_input_images = None
     if input_images and len(input_images) > 0:
-        first_image = input_images[0]
-        processed_image = await process_input_image(first_image)
-        if processed_image:
-            processed_input_images = [processed_image]
-            print(f"Using input image for video generation: {first_image}")
-        else:
+        processed_input_images = []
+        for img in input_images:
+            processed_image = await process_input_image(img)
+            if processed_image:
+                processed_input_images.append(processed_image)
+                print(f"Using input image for video generation: {img}")
+            else:
+                print(f"Warning: Failed to process input image: {img}, skipping...")
+        
+        if len(processed_input_images) == 0:
             raise ValueError(
-                f"Failed to process input image: {first_image}. Please check if the image exists and is valid.")
+                "Failed to process any input images. Please check if the images exist and are valid.")
 
     return await generate_video_with_provider(
         prompt=prompt,

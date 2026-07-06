@@ -19,7 +19,7 @@ class GenerateImageByFluxKontextMaxInputSchema(BaseModel):
 
 
 @tool("generate_image_by_flux_kontext_max",
-      description="Generate an image by Flux Kontext Max model using text prompt or optionally pass an image for reference or editing. Use this model for high-quality image generation with Flux's advanced AI. Supports multiple providers with automatic fallback.",
+      description="使用 Flux Kontext Max 模型通过文本提示生成图像，或可选地传递图像作为参考或编辑。使用此模型进行高质量图像生成。支持多个提供商自动降级。提示词必须使用中文。",
       args_schema=GenerateImageByFluxKontextMaxInputSchema)
 async def generate_image_by_flux_kontext_max(
     prompt: str,

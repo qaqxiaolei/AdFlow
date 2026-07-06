@@ -33,9 +33,11 @@ class AgentManager:
         # 为不同类型的智能体过滤合适的工具
         image_tools =  [tool for tool in tool_list if tool.get('type') == 'image']
         video_tools = [tool for tool in tool_list if tool.get('type') == 'video']
+        search_tools = [tool for tool in tool_list if tool.get('type') == 'search']
 
         print(f"📸 图像工具: {image_tools}")
         print(f"🎬 视频工具: {video_tools}")
+        print(f"🔍 搜索工具: {search_tools}")
 
         planner_config = PlannerAgentConfig()
         planner_agent = AgentManager._create_langgraph_agent(

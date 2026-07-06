@@ -16,11 +16,11 @@ class DatabaseService:
         self._init_db()
 
     def _ensure_db_directory(self):
-        """Ensure the database directory exists"""
+        """确保数据库目录存在"""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
     def _init_db(self):
-        """Initialize the database with the current schema"""
+        """使用当前schema初始化数据库"""
         with sqlite3.connect(self.db_path) as conn:
             # Create version table if it doesn't exist
             conn.execute("""
@@ -44,7 +44,7 @@ class DatabaseService:
                 self._migration_manager.migrate(conn, current_version[0], CURRENT_VERSION)
 
     async def create_canvas(self, id: str, name: str):
-        """Create a new canvas"""
+        """创建一个新的画布"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 INSERT INTO canvases (id, name)
@@ -53,7 +53,7 @@ class DatabaseService:
             await db.commit()
 
     async def list_canvases(self) -> List[Dict[str, Any]]:
-        """Get all canvases"""
+        """获取所有画布"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
             cursor = await db.execute("""
@@ -65,7 +65,7 @@ class DatabaseService:
             return [dict(row) for row in rows]
 
     async def create_chat_session(self, id: str, model: str, provider: str, canvas_id: str, title: Optional[str] = None):
-        """Save a new chat session"""
+        """创建一个新的聊天会话"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 INSERT OR REPLACE INTO chat_sessions (id, model, provider, canvas_id, title)
@@ -74,7 +74,7 @@ class DatabaseService:
             await db.commit()
 
     async def create_message(self, session_id: str, role: str, message: str):
-        """Save a chat message"""
+        """创建一个聊天消息"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 INSERT INTO chat_messages (session_id, role, message)
@@ -83,7 +83,7 @@ class DatabaseService:
             await db.commit()
 
     async def get_chat_history(self, session_id: str) -> List[Dict[str, Any]]:
-        """Get chat history for a session"""
+        """获取聊天历史记录"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
             cursor = await db.execute("""
@@ -107,7 +107,7 @@ class DatabaseService:
             return messages
 
     async def list_sessions(self, canvas_id: str) -> List[Dict[str, Any]]:
-        """List all chat sessions"""
+        """获取所有聊天会话"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
             if canvas_id:
@@ -127,7 +127,7 @@ class DatabaseService:
             return [dict(row) for row in rows]
 
     async def save_canvas_data(self, id: str, data: str, thumbnail: str = None):
-        """Save canvas data"""
+        """保存画布数据"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 UPDATE canvases 
@@ -137,7 +137,7 @@ class DatabaseService:
             await db.commit()
 
     async def get_canvas_data(self, id: str) -> Optional[Dict[str, Any]]:
-        """Get canvas data"""
+        """获取画布数据"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
             cursor = await db.execute("""
@@ -146,9 +146,7 @@ class DatabaseService:
                 WHERE id = ?
             """, (id,))
             row = await cursor.fetchone()
-
             sessions = await self.list_sessions(id)
-            
             if row:
                 return {
                     'data': json.loads(row['data']) if row['data'] else {},
@@ -158,19 +156,19 @@ class DatabaseService:
             return None
 
     async def delete_canvas(self, id: str):
-        """Delete canvas and related data"""
+        """删除画布"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("DELETE FROM canvases WHERE id = ?", (id,))
             await db.commit()
 
     async def rename_canvas(self, id: str, name: str):
-        """Rename canvas"""
+        """重命名画布"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("UPDATE canvases SET name = ? WHERE id = ?", (name, id))
             await db.commit()
 
     async def create_comfy_workflow(self, name: str, api_json: str, description: str, inputs: str, outputs: str = None):
-        """Create a new comfy workflow"""
+        """创建一个新的Comfy 工作流"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 INSERT INTO comfy_workflows (name, api_json, description, inputs, outputs)
@@ -179,7 +177,7 @@ class DatabaseService:
             await db.commit()
 
     async def list_comfy_workflows(self) -> List[Dict[str, Any]]:
-        """List all comfy workflows"""
+        """获取所有Comfy 工作流"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
             cursor = await db.execute("SELECT id, name, description, api_json, inputs, outputs FROM comfy_workflows ORDER BY id DESC")
@@ -187,13 +185,13 @@ class DatabaseService:
             return [dict(row) for row in rows]
 
     async def delete_comfy_workflow(self, id: int):
-        """Delete a comfy workflow"""
+        """删除Comfy 工作流"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("DELETE FROM comfy_workflows WHERE id = ?", (id,))
             await db.commit()
 
     async def get_comfy_workflow(self, id: int):
-        """Get comfy workflow dict"""
+        """获取Comfy 工作流字典表示"""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = sqlite3.Row
             cursor = await db.execute(

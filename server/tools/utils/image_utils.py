@@ -11,7 +11,7 @@ from services.config_service import FILES_DIR
 
 
 def generate_image_id() -> str:
-    """Generate unique image ID"""
+    """生成唯一图像ID"""
     return generate(size=10)
 
 
@@ -22,16 +22,16 @@ async def get_image_info_and_save(
     metadata: Optional[dict[str, Any]] = None
 ) -> Tuple[str, int, int, str]:
     """
-    Download image from URL or decode base64, convert to PNG and save with metadata
+    从URL下载图像或解码base64，转换为PNG并保存元数据
 
-    Args:
-        url: Image URL or base64 string
-        file_path_without_extension: File path without extension
-        is_b64: Whether the url is a base64 string
-        metadata: Optional metadata to be saved in PNG info
+    参数:
+        url: 图像URL或base64字符串
+        file_path_without_extension: 不带扩展名的文件路径
+        is_b64: url是否为base64字符串
+        metadata: 要保存在PNG信息中的可选元数据
 
-    Returns:
-        tuple[str, int, int, str]: (mime_type, width, height, extension) - always PNG
+    返回:
+        tuple[str, int, int, str]: (mime_type, width, height, extension) - 始终为PNG
     """
     try:
         if is_b64:

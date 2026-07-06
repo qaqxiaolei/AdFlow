@@ -14,26 +14,24 @@ class ToolConfig(TypedDict):
 
 
 def _normalize_agent_name(name: str) -> str:
-    """Normalize agent name to be compatible with tool names."""
+    """标准化智能体名称以兼容工具名称。"""
     return name.lower().replace(" ", "_").replace("-", "_")
 
 
 def create_handoff_tool(
     *, agent_name: str, name: Optional[str] = None, description: Optional[str] = None
 ) -> BaseTool:
-    """Create a tool that can handoff control to the requested agent.
+    """创建一个可以将控制权切换到指定智能体的工具。
 
-    Args:
-        agent_name: The name of the agent to handoff control to, i.e.
-            the name of the agent node in the multi-agent graph.
-            Agent names should be simple, clear and unique, preferably in snake_case,
-            although you are only limited to the names accepted by LangGraph
-            nodes as well as the tool names accepted by LLM providers
-            (the tool name will look like this: `transfer_to_<agent_name>`).
-        name: Optional name of the tool to use for the handoff.
-            If not provided, the tool name will be `transfer_to_<agent_name>`.
-        description: Optional description for the handoff tool.
-            If not provided, the tool description will be `Ask agent <agent_name> for help`.
+    参数:
+        agent_name: 要切换控制权的智能体名称，即多智能体图中的智能体节点名称。
+            智能体名称应简洁、清晰且唯一，最好使用snake_case格式，
+            虽然您只受限于LangGraph节点接受的名称以及LLM提供商接受的工具名称
+            (工具名称将如下所示: `transfer_to_<agent_name>`)。
+        name: 用于切换的工具的可选名称。
+            如果未提供，工具名称将为 `transfer_to_<agent_name>`。
+        description: 切换工具的可选描述。
+            如果未提供，工具描述将为 `Ask agent <agent_name> for help`。
     """
     if name is None:
         name = f"transfer_to_{_normalize_agent_name(agent_name)}"

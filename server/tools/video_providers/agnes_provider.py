@@ -30,8 +30,9 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
 
     async def _poll_task_status(self, task_id: str, headers: Dict[str, str]) -> str:
         polling_url = f"{self.base_url}/videos/{task_id}"
-        max_attempts = 150
-        interval = 3.0
+        max_attempts = 60
+        initial_interval = 2.0
+        max_interval = 15.0
 
         for attempt in range(max_attempts):
             print(f"🎥 Polling Agnes generation {task_id} (attempt {attempt+1})...")
@@ -41,8 +42,9 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                     response = await client.get(polling_url, headers=headers)
 
                     if response.status_code == 429:
-                        print(f"🎥 Polling rate limited, waiting {interval * 2} seconds...")
-                        await asyncio.sleep(interval * 2)
+                        interval = min(initial_interval * (2 ** attempt), max_interval)
+                        print(f"🎥 Polling rate limited, waiting {interval} seconds...")
+                        await asyncio.sleep(interval)
                         continue
 
                     if response.status_code != 200:
@@ -56,7 +58,7 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
 
                     status = poll_res.get("status", None)
 
-                    if status == "succeeded":
+                    if status in ("succeeded", "completed"):
                         video_url = poll_res.get("url") or poll_res.get("video_url") or poll_res.get("result_url")
                         if video_url and isinstance(video_url, str):
                             return video_url
@@ -68,13 +70,16 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                     elif status == "cancelled":
                         raise Exception("任务已取消")
                     elif status in ("pending", "processing", "running", "queued", "in_progress"):
+                        interval = min(initial_interval * (1.5 ** attempt), max_interval)
+                        print(f"🎥 Task {task_id} still {status}, next poll in {interval:.1f}s")
                         await asyncio.sleep(interval)
                         continue
                     else:
                         raise Exception(f"未知任务状态: {status}")
             except Exception as e:
                 if "Connection" in str(e) or "timeout" in str(e).lower():
-                    print(f"🎥 Polling connection issue: {e}, retrying...")
+                    interval = min(initial_interval * (2 ** attempt), max_interval)
+                    print(f"🎥 Polling connection issue: {e}, retrying in {interval:.1f}s...")
                     await asyncio.sleep(interval)
                     continue
                 raise
@@ -104,6 +109,7 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                 "model": model,
                 "prompt": prompt,
                 "num_frames": num_frames,
+                "aspect_ratio": aspect_ratio,
             }
 
             if input_images:

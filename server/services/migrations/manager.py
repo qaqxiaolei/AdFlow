@@ -24,17 +24,17 @@ ALL_MIGRATIONS = [
 ]
 class MigrationManager:
     def get_migrations_to_apply(self, current_version: int, target_version: int) -> List[Type[Migration]]:
-        """Get list of migrations to apply"""
+        """获取要应用的迁移列表"""
         return [m for m in ALL_MIGRATIONS
                 if m['version'] > current_version and m['version'] <= target_version]
 
     def get_migrations_to_rollback(self, current_version: int, target_version: int) -> List[Type[Migration]]:
-        """Get list of migrations to rollback"""
+        """获取要回滚的迁移列表"""
         return [m for m in reversed(ALL_MIGRATIONS)
                 if m['version'] <= current_version and m['version'] > target_version]
 
     def migrate(self, conn: sqlite3.Connection, from_version: int, to_version: int) -> None:
-        """Apply or rollback migrations to reach target version"""
+        """应用或回滚迁移以达到目标版本"""
         if from_version < to_version:
             # Apply migrations forward
             print('🦄 Applying migrations forward', from_version, '->', to_version)

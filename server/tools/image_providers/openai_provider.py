@@ -9,7 +9,7 @@ from services.config_service import config_service
 
 
 class OpenAIImageProvider(ImageProviderBase):
-    """OpenAI image generation provider implementation"""
+    """OpenAI图像生成提供商实现"""
 
     async def generate(
         self,
@@ -20,9 +20,9 @@ class OpenAIImageProvider(ImageProviderBase):
         **kwargs: Any
     ) -> tuple[str, int, int, str]:
         """
-        Generate image using OpenAI API
+        使用OpenAI API生成图像
 
-        Returns:
+        返回:
             tuple[str, int, int, str]: (mime_type, width, height, filename)
         """
 

@@ -61,10 +61,10 @@ def get_asset_path(filename):
 
 
 class ComfyUIGenerator():
-    """ComfyUI image generator implementation"""
+    """ComfyUI图像生成器实现"""
 
     def __init__(self):
-        # Load workflows
+        # 加载工作流
         asset_dir = get_asset_path("flux_comfy_workflow.json")
         basic_comfy_t2i_workflow = get_asset_path("default_comfy_t2i_workflow.json")
 
@@ -89,7 +89,7 @@ class ComfyUIGenerator():
         **kwargs,
     ) -> tuple[str, int, int, str]:
         """
-        Generate an image by calling offical ComfyUI Client
+        通过调用官方ComfyUI客户端生成图像
         """
         if not self.flux_comfy_workflow:
             raise FileNotFoundError("Flux workflow json not found")
@@ -144,10 +144,10 @@ class ComfyUIGenerator():
 
 
 class ComfyUIWorkflowRunner():
-    """ComfyUI image generator implementation"""
+    """ComfyUI工作流运行器实现"""
 
     def __init__(self, workflow_dict, base_url):
-        # Load workflows
+        # 加载工作流
         self.workflow = workflow_dict
         self.base_url = base_url
 
