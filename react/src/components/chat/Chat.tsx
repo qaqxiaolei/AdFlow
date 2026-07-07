@@ -75,13 +75,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             setSession(null)
         }
     }, [sessionList, searchSessionId])
-
     const [messages, setMessages] = useState<Message[]>([])
     const [pending, setPending] = useState<PendingType>(
         initCanvas ? 'text' : false
     )
     const mergedToolCallIds = useRef<string[]>([])
-
     const sessionId = session?.id ?? searchSessionId
 
     const sessionIdRef = useRef<string>(session?.id || nanoid())
@@ -89,10 +87,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const [pendingToolConfirmations, setPendingToolConfirmations] = useState<
         string[]
     >([])
-
     const scrollRef = useRef<HTMLDivElement>(null)
     const isAtBottomRef = useRef(false)
-
     const scrollToBottom = useCallback(() => {
         if (!isAtBottomRef.current) {
             return
@@ -124,7 +120,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             }
             return message
         })
-
         return messagesWithToolCallResult
     }
 
@@ -133,7 +128,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             setPending('text')
             setMessages(
                 produce((prev) => {
@@ -170,18 +164,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             const existToolCall = messages.find(
                 (m) =>
                     m.role === 'assistant' &&
                     m.tool_calls &&
                     m.tool_calls.find((t) => t.id == data.id)
             )
-
             if (existToolCall) {
                 return
             }
-
             setMessages(
                 produce((prev) => {
                     console.log('👇tool_call event get', data)
@@ -202,7 +193,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     })
                 })
             )
-
             setExpandingToolCalls(
                 produce((prev) => {
                     prev.push(data.id)
@@ -217,18 +207,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             const existToolCall = messages.find(
                 (m) =>
                     m.role === 'assistant' &&
                     m.tool_calls &&
                     m.tool_calls.find((t) => t.id == data.id)
             )
-
             if (existToolCall) {
                 return
             }
-
             setMessages(
                 produce((prev) => {
                     console.log('👇tool_call_pending_confirmation event get', data)
@@ -249,13 +236,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     })
                 })
             )
-
             setPendingToolConfirmations(
                 produce((prev) => {
                     prev.push(data.id)
                 })
             )
-
             // 自动展开需要确认的工具调用
             setExpandingToolCalls(
                 produce((prev) => {
@@ -273,13 +258,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             setPendingToolConfirmations(
                 produce((prev) => {
                     return prev.filter((id) => id !== data.id)
                 })
             )
-
             setExpandingToolCalls(
                 produce((prev) => {
                     if (!prev.includes(data.id)) {
@@ -296,13 +279,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             setPendingToolConfirmations(
                 produce((prev) => {
                     return prev.filter((id) => id !== data.id)
                 })
             )
-
             // 更新工具调用的状态
             setMessages(
                 produce((prev) => {
@@ -327,7 +308,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             setMessages(
                 produce((prev) => {
                     setPending('tool')
@@ -392,7 +372,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             ) {
                 return
             }
-
             console.log('⭐️dispatching image_generated', data)
             setPending('image')
         },
@@ -404,7 +383,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             setMessages(() => {
                 console.log('👇all_messages', data.messages)
                 return data.messages
@@ -420,7 +398,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             if (data.session_id && data.session_id !== sessionId) {
                 return
             }
-
             setPending(false)
             scrollToBottom()
 
@@ -504,22 +481,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
     })
 
+    // useCallback 用于缓存函数实例，避免组件每次重渲染时重复创建全新函数
     const initChat = useCallback(async () => {
         if (!sessionId) {
             return
         }
-
         sessionIdRef.current = sessionId
-
         const resp = await fetch('/api/chat_session/' + sessionId)
         const data = await resp.json()
         const msgs = data?.length ? data : []
-
         setMessages(mergeToolCallResult(msgs))
         if (msgs.length > 0) {
             setInitCanvas(false)
         }
-
         scrollToBottom()
     }, [sessionId, scrollToBottom, setInitCanvas])
 
@@ -554,7 +528,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         (data: Message[], configs: { textModel: Model; toolList: ToolInfo[] }) => {
             setPending('text')
             setMessages(data)
-
             sendMessages({
                 sessionId: sessionId!,
                 canvasId: canvasId,
@@ -564,7 +537,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 systemPrompt:
                     localStorage.getItem('system_prompt') || DEFAULT_SYSTEM_PROMPT,
             })
-
             if (searchSessionId !== sessionId) {
                 window.history.pushState(
                     {},
@@ -572,7 +544,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     `/canvas/${canvasId}?sessionId=${sessionId}`
                 )
             }
-
             scrollToBottom()
         },
         [canvasId, sessionId, searchSessionId, scrollToBottom]
@@ -588,7 +559,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 {/* 桌面端卡片式容器 */}
                 <div className='flex flex-col w-full h-full lg:mx-auto lg:w-[80%] lg:h-[calc(100vh-2rem-32px)] lg:rounded-2xl lg:shadow-xl lg:border lg:border-border overflow-hidden'>
                     {/* Chat messages */}
-
                     <header className='flex items-center px-3 py-3 relative z-10 bg-background/80 backdrop-blur-sm border-b border-border/50'>
                         <div className='flex-1 min-w-0'>
                             <SessionSelector
@@ -598,7 +568,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                 onSelectSession={onSelectSession}
                             />
                         </div>
-
                         {/* Share Template Button */}
                         {/* {authStatus.is_logged_in && (
             <Button

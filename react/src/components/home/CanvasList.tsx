@@ -5,11 +5,13 @@ import { useNavigate, useLocation } from '@tanstack/react-router'
 import { AnimatePresence, motion } from 'motion/react'
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useConfigs } from '@/contexts/configs'
 
 const CanvasList: React.FC = () => {
     const { t } = useTranslation()
     const location = useLocation()
     const isHomePage = location.pathname === '/'
+    const { initCanvas, setInitCanvas } = useConfigs()
 
     const { data: canvases, refetch } = useQuery({
         queryKey: ['canvases'],
@@ -19,8 +21,12 @@ const CanvasList: React.FC = () => {
     })
 
     const navigate = useNavigate()
-    const handleCanvasClick = (id: string) => {
-        navigate({ to: '/canvas/$id', params: { id } })
+    const handleCanvasClick = (id: string, sessionId: string) => {
+        navigate({
+            to: '/canvas/$id',
+            params: { id },
+            search: sessionId ? { sessionId } : {}
+        })
     }
 
     return (
@@ -35,7 +41,6 @@ const CanvasList: React.FC = () => {
                     {t('home:allProjects')}
                 </motion.span>
             )}
-
             <AnimatePresence>
                 <div className="grid grid-cols-4 gap-4 w-full pb-10">
                     {canvases?.map((canvas, index) => (
@@ -43,7 +48,7 @@ const CanvasList: React.FC = () => {
                             key={canvas.id}
                             index={index}
                             canvas={canvas}
-                            handleCanvasClick={handleCanvasClick}
+                            handleCanvasClick={() => handleCanvasClick(canvas.id, canvas.session_id)}
                             handleDeleteCanvas={() => refetch()}
                         />
                     ))}

@@ -21,7 +21,7 @@ function Home() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { setInitCanvas } = useConfigs()
-
+  // useMutation 是 @tanstack/react-query 提供的异步提交接口专用钩子，专门处理「新增 / 修改 / 删除」这类会改变后端数据的请求（区别于 useQuery 查数据）
   const { mutate: createCanvasMutation, isPending } = useMutation({
     mutationFn: createCanvas,
     onSuccess: (data, variables) => {

@@ -154,13 +154,11 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   // Send Prompt
   const handleSendPrompt = useCallback(async () => {
     if (pending) return
-
     // 检查是否使用 Jaaz 服务
     const isUsingJaaz =
       textModel?.provider === 'jaaz' ||
       selectedTools?.some((tool) => tool.provider === 'jaaz')
     // console.log('👀isUsingJaaz', textModel, selectedTools, isUsingJaaz)
-
     // 只有当使用 Jaaz 服务且余额为 0 时才提醒充值
     if (authStatus.is_logged_in && isUsingJaaz && parseFloat(balance) <= 0) {
       toast.error(t('chat:insufficientBalance'), {
@@ -169,7 +167,6 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       })
       return
     }
-
     if (!textModel) {
       toast.error(t('chat:textarea.selectModel'))
       if (!authStatus.is_logged_in) {
@@ -177,18 +174,15 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       }
       return
     }
-
     if (!selectedTools || selectedTools.length === 0) {
       toast.warning(t('chat:textarea.selectTool'))
     }
-
     let text_content: MessageContent[] | string = prompt
     if (prompt.length === 0 || prompt.trim() === '') {
       toast.error(t('chat:textarea.enterPrompt'))
       return
     }
-
-    // Add aspect ratio and quantity information if not default values
+    // 如非默认值，请添加宽高比和数量信息
     let additionalInfo = ''
     if (selectedAspectRatio !== 'auto') {
       additionalInfo += `<aspect_ratio>${selectedAspectRatio}</aspect_ratio>\n`
@@ -196,11 +190,9 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     if (quantity !== 1) {
       additionalInfo += `<quantity>${quantity}</quantity>\n`
     }
-
     if (additionalInfo) {
       text_content = text_content + '\n\n' + additionalInfo
     }
-
     if (images.length > 0) {
       text_content += `\n\n<input_images count="${images.length}">`
       images.forEach((image, index) => {
@@ -208,8 +200,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       })
       text_content += `\n</input_images>`
     }
-
-    // Fetch images as base64
+    // 从服务器获取图片并转换为 base64 编码的 URL
     const imagePromises = images.map(async (image) => {
       const response = await fetch(`/api/file/${image.file_id}`)
       const blob = await response.blob()
@@ -219,9 +210,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         reader.readAsDataURL(blob)
       })
     })
-
     const base64Images = await Promise.all(imagePromises)
-
     const final_content = [
       {
         type: 'text',
@@ -234,17 +223,14 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         },
       })),
     ] as MessageContent[]
-
     const newMessage = messages.concat([
       {
         role: 'user',
         content: final_content,
       },
     ])
-
     setImages([])
     setPrompt('')
-
     onSendMessages(newMessage, {
       textModel: textModel,
       toolList: selectedTools && selectedTools.length > 0 ? selectedTools : [],
@@ -572,29 +558,31 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
           </div>
         </div>
 
-        {pending ? (
-          <Button
-            className="shrink-0 relative"
-            variant="default"
-            size="icon"
-            onClick={handleCancelChat}
-          >
-            <Loader2 className="size-5.5 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-            <Square className="size-2 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </Button>
-        ) : (
-          <Button
-            className="shrink-0"
-            variant="default"
-            size="icon"
-            onClick={handleSendPrompt}
-            disabled={!textModel || !selectedTools || prompt.length === 0}
-          >
-            <ArrowUp className="size-4" />
-          </Button>
-        )}
-      </div>
-    </motion.div>
+        {
+          pending ? (
+            <Button
+              className="shrink-0 relative"
+              variant="default"
+              size="icon"
+              onClick={handleCancelChat}
+            >
+              <Loader2 className="size-5.5 animate-spin absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+              <Square className="size-2 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </Button>
+          ) : (
+            <Button
+              className="shrink-0"
+              variant="default"
+              size="icon"
+              onClick={handleSendPrompt}
+              disabled={!textModel || !selectedTools || prompt.length === 0}
+            >
+              <ArrowUp className="size-4" />
+            </Button>
+          )
+        }
+      </div >
+    </motion.div >
   )
 }
 
