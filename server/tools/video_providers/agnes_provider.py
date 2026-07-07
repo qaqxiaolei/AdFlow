@@ -234,4 +234,6 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                 raise Exception("服务暂时不可用，请稍后重试")
             print(f"🎥 Error generating video with Agnes: {error_msg}")
             traceback.print_exc()
+            print(f"🎥 Full error traceback for Agnes video generation:")
+            traceback.print_exc()
             raise Exception(f"视频生成失败: {error_msg}")

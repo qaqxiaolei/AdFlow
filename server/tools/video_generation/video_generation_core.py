@@ -112,7 +112,10 @@ async def generate_video_with_provider(
     except Exception as e:
         error_message = str(e)
         print(f"🎥 Error generating video with {model_name}: {error_message}")
+        print(f"🎥 Full error traceback:")
         traceback.print_exc()
+        print(f"🎥 Context info - canvas_id: {canvas_id}, session_id: {session_id}")
+        print(f"🎥 Generation params - prompt: {prompt[:100]}..., resolution: {resolution}, duration: {duration}, aspect_ratio: {aspect_ratio}")
 
         # Send error notification
         await send_video_error_notification(session_id, error_message)

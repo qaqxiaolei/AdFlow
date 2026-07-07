@@ -15,8 +15,8 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
         description="Optional. The resolution of the video. Use 480p if not explicitly specified by user. Allowed values: 480p, 1080p."
     )
     duration: int = Field(
-        default=5,
-        description="Optional. The duration of the video in seconds. Use 5 by default. Allowed values: 5, 10."
+        default=10,
+        description="Optional. The duration of the video in seconds. Use 10 by default. Allowed values: 5, 10, 15. Must not exceed 15 seconds."
     )
     aspect_ratio: str = Field(
         default="16:9",
@@ -30,14 +30,14 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
 
 
 @tool("generate_video_by_agnes",
-      description="使用 Agnes AI 视频模型生成视频。提示词必须使用中文。",
+      description="使用 Agnes AI 视频模型生成视频。提示词必须使用英文，包含详细的视觉描述。",
       args_schema=GenerateVideoByAgnesInputSchema)
 async def generate_video_by_agnes(
     prompt: str,
     config: RunnableConfig,
     tool_call_id: Annotated[str, InjectedToolCallId],
     resolution: str = "480p",
-    duration: int = 5,
+    duration: int = 10,
     aspect_ratio: str = "16:9",
     input_images: list[str] | None = None,
 ) -> str:

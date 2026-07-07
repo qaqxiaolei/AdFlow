@@ -207,10 +207,14 @@ def generate_video_file_id() -> str:
 async def get_video_info_and_save(
     url: str, file_path_without_extension: str
 ) -> Tuple[str, int, int, str]:
+    print(f"🎥 Attempting to download video from: {url}")
     try:
         video_content = await HttpClient.download_bytes(url)
+        print(f"🎥 Video download successful, size: {len(video_content)} bytes")
     except Exception as error:
         error_message = str(error)
+        print(f"🎥 Video download failed: {error_message}")
+        traceback.print_exc()
         if (
             'platform-outputs.agnes-ai.space' in url
             or 'agnes-ai.space' in url
