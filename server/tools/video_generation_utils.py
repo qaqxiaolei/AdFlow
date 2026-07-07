@@ -25,10 +25,7 @@ def generate_video_file_id():
 async def get_video_info_and_save(
     url: str, file_path_without_extension: str
 ) -> tuple[str, int, int, str]:
-    # Fetch the video asynchronously
-    async with HttpClient.create_aiohttp() as session:
-        async with session.get(url) as response:
-            video_content = await response.read()
+    video_content = await HttpClient.download_bytes(url)
 
     # Save to temporary mp4 file first
     temp_path = f"{file_path_without_extension}.mp4"

@@ -21,43 +21,46 @@ class DatabaseService:
 
     def _init_db(self):
         """使用当前schema初始化数据库"""
-        with sqlite3.connect(self.db_path) as conn:
-            # Create version table if it doesn't exist
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=30000")
+            
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS db_version (
                     version INTEGER PRIMARY KEY
                 )
             """)
             
-            # Get current version
             cursor = conn.execute("SELECT version FROM db_version")
             current_version = cursor.fetchone()
             print('local db version', current_version, 'latest version', CURRENT_VERSION)
             
             if current_version is None:
-                # First time setup - start from version 0
                 conn.execute("INSERT INTO db_version (version) VALUES (0)")
                 self._migration_manager.migrate(conn, 0, CURRENT_VERSION)
             elif current_version[0] < CURRENT_VERSION:
                 print('Migrating database from version', current_version[0], 'to', CURRENT_VERSION)
-                # Need to migrate
                 self._migration_manager.migrate(conn, current_version[0], CURRENT_VERSION)
-
-    async def create_canvas(self, id: str, name: str):
+    
+    async def create_canvas(self, id: str, name: str, session_id: str = None):
         """创建一个新的画布"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("""
-                INSERT INTO canvases (id, name)
-                VALUES (?, ?)
-            """, (id, name))
+                INSERT INTO canvases (id, name, session_id)
+                VALUES (?, ?, ?)
+            """, (id, name, session_id))
             await db.commit()
 
     async def list_canvases(self) -> List[Dict[str, Any]]:
         """获取所有画布"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             db.row_factory = sqlite3.Row
             cursor = await db.execute("""
-                SELECT id, name, description, thumbnail, created_at, updated_at
+                SELECT id, name, description, thumbnail, created_at, updated_at, session_id
                 FROM canvases
                 ORDER BY updated_at DESC
             """)
@@ -66,7 +69,9 @@ class DatabaseService:
 
     async def create_chat_session(self, id: str, model: str, provider: str, canvas_id: str, title: Optional[str] = None):
         """创建一个新的聊天会话"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("""
                 INSERT OR REPLACE INTO chat_sessions (id, model, provider, canvas_id, title)
                 VALUES (?, ?, ?, ?, ?)
@@ -75,7 +80,9 @@ class DatabaseService:
 
     async def create_message(self, session_id: str, role: str, message: str):
         """创建一个聊天消息"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("""
                 INSERT INTO chat_messages (session_id, role, message)
                 VALUES (?, ?, ?)
@@ -84,7 +91,9 @@ class DatabaseService:
 
     async def get_chat_history(self, session_id: str) -> List[Dict[str, Any]]:
         """获取聊天历史记录"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             db.row_factory = sqlite3.Row
             cursor = await db.execute("""
                 SELECT role, message, id
@@ -108,7 +117,9 @@ class DatabaseService:
 
     async def list_sessions(self, canvas_id: str) -> List[Dict[str, Any]]:
         """获取所有聊天会话"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             db.row_factory = sqlite3.Row
             if canvas_id:
                 cursor = await db.execute("""
@@ -128,7 +139,9 @@ class DatabaseService:
 
     async def save_canvas_data(self, id: str, data: str, thumbnail: str = None):
         """保存画布数据"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("""
                 UPDATE canvases 
                 SET data = ?, thumbnail = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
@@ -138,7 +151,9 @@ class DatabaseService:
 
     async def get_canvas_data(self, id: str) -> Optional[Dict[str, Any]]:
         """获取画布数据"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             db.row_factory = sqlite3.Row
             cursor = await db.execute("""
                 SELECT data, name
@@ -157,19 +172,25 @@ class DatabaseService:
 
     async def delete_canvas(self, id: str):
         """删除画布"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("DELETE FROM canvases WHERE id = ?", (id,))
             await db.commit()
 
     async def rename_canvas(self, id: str, name: str):
         """重命名画布"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("UPDATE canvases SET name = ? WHERE id = ?", (name, id))
             await db.commit()
 
     async def create_comfy_workflow(self, name: str, api_json: str, description: str, inputs: str, outputs: str = None):
         """创建一个新的Comfy 工作流"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("""
                 INSERT INTO comfy_workflows (name, api_json, description, inputs, outputs)
                 VALUES (?, ?, ?, ?, ?)
@@ -178,7 +199,9 @@ class DatabaseService:
 
     async def list_comfy_workflows(self) -> List[Dict[str, Any]]:
         """获取所有Comfy 工作流"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             db.row_factory = sqlite3.Row
             cursor = await db.execute("SELECT id, name, description, api_json, inputs, outputs FROM comfy_workflows ORDER BY id DESC")
             rows = await cursor.fetchall()
@@ -186,13 +209,17 @@ class DatabaseService:
 
     async def delete_comfy_workflow(self, id: int):
         """删除Comfy 工作流"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             await db.execute("DELETE FROM comfy_workflows WHERE id = ?", (id,))
             await db.commit()
 
     async def get_comfy_workflow(self, id: int):
         """获取Comfy 工作流字典表示"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
             db.row_factory = sqlite3.Row
             cursor = await db.execute(
                 "SELECT api_json FROM comfy_workflows WHERE id = ?", (id,)

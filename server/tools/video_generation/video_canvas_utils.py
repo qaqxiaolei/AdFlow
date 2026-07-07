@@ -207,10 +207,22 @@ def generate_video_file_id() -> str:
 async def get_video_info_and_save(
     url: str, file_path_without_extension: str
 ) -> Tuple[str, int, int, str]:
-    # Fetch the video asynchronously
-    async with HttpClient.create_aiohttp() as session:
-        async with session.get(url) as response:
-            video_content = await response.read()
+    try:
+        video_content = await HttpClient.download_bytes(url)
+    except Exception as error:
+        error_message = str(error)
+        if (
+            'platform-outputs.agnes-ai.space' in url
+            or 'agnes-ai.space' in url
+            or 'agnes-aigc' in url
+        ):
+            raise Exception(
+                '无法下载生成的视频文件（CDN 连接超时）。'
+                '视频已在 Agnes 云端生成成功，但本地无法访问其 CDN。'
+                '请在「设置 → 代理」中配置代理（例如 http://127.0.0.1:7897）后重试。'
+                f' 原始错误: {error_message}'
+            ) from error
+        raise
 
     # Save to temporary mp4 file first
     temp_path = f"{file_path_without_extension}.mp4"

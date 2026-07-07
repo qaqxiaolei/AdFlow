@@ -37,11 +37,7 @@ async def get_image_info_and_save(
         if is_b64:
             image_data = base64.b64decode(url)
         else:
-            # Fetch the image asynchronously
-            async with HttpClient.create_aiohttp() as session:
-                async with session.get(url) as response:
-                    # Read the image content as bytes
-                    image_data = await response.read()
+            image_data = await HttpClient.download_bytes(url)
 
         # Open image to get info
         image = Image.open(BytesIO(image_data))

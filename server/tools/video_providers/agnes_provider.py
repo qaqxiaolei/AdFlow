@@ -28,8 +28,32 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
             "Content-Type": "application/json",
         }
 
-    async def _poll_task_status(self, task_id: str, headers: Dict[str, str]) -> str:
-        polling_url = f"{self.base_url}/videos/{task_id}"
+    def _get_api_root(self) -> str:
+        url = self.base_url.rstrip("/")
+        if url.endswith("/v1"):
+            return url[:-3]
+        return url
+
+    def _extract_video_url(self, poll_res: Dict[str, Any]) -> Optional[str]:
+        for key in ("url", "video_url", "result_url", "remixed_from_video_id"):
+            value = poll_res.get(key)
+            if isinstance(value, str) and value.startswith("http"):
+                return value
+        return None
+
+    async def _poll_task_status(
+        self,
+        task_id: str,
+        headers: Dict[str, str],
+        video_id: Optional[str] = None,
+    ) -> str:
+        if video_id:
+            polling_url = (
+                f"{self._get_api_root()}/agnesapi"
+                f"?video_id={video_id}&model_name=agnes-video-v2.0"
+            )
+        else:
+            polling_url = f"{self.base_url}/videos/{task_id}"
         max_attempts = 60
         initial_interval = 2.0
         max_interval = 15.0
@@ -59,11 +83,12 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                     status = poll_res.get("status", None)
 
                     if status in ("succeeded", "completed"):
-                        video_url = poll_res.get("url") or poll_res.get("video_url") or poll_res.get("result_url")
-                        if video_url and isinstance(video_url, str):
+                        video_url = self._extract_video_url(poll_res)
+                        if video_url:
+                            # Give CDN a moment to make the file available.
+                            await asyncio.sleep(3)
                             return video_url
-                        else:
-                            raise Exception("生成成功但未找到视频链接")
+                        raise Exception("生成成功但未找到视频链接")
                     elif status == "failed":
                         error_message = poll_res.get("error", f"任务失败: {status}")
                         raise Exception(f"视频生成失败: {error_message}")
@@ -124,6 +149,7 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                 print(f"🎥 Video generation attempt {attempt+1}/{max_retries+1}")
 
                 task_id = None
+                video_id = None
 
                 try:
                     async with HttpClient.create(timeout=httpx.Timeout(60.0)) as client:
@@ -136,12 +162,16 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                                 raise Exception(f"解析响应失败: {response.text}")
 
                             task_id = result.get("task_id", None) or result.get("id", None)
+                            video_id = result.get("video_id", None)
 
-                            if not task_id:
+                            if not task_id and not video_id:
                                 print("🎥 Failed to create Agnes video generation task:", result)
                                 raise Exception("创建视频任务失败，请稍后重试")
 
-                            print(f"🎥 Agnes video generation task created, task_id: {task_id}")
+                            print(
+                                f"🎥 Agnes video generation task created, "
+                                f"task_id: {task_id}, video_id: {video_id}"
+                            )
 
                         elif response.status_code == 429:
                             print(f"🎥 Agnes rate limit exceeded (attempt {attempt+1}/{max_retries})")
@@ -180,8 +210,13 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                     else:
                         raise
 
-                if task_id:
-                    video_url = await self._poll_task_status(task_id, headers)
+                if task_id or video_id:
+                    resolved_task_id = task_id or video_id or ""
+                    video_url = await self._poll_task_status(
+                        resolved_task_id,
+                        headers,
+                        video_id=video_id,
+                    )
                     print(f"🎥 Agnes video generation completed, video URL: {video_url}")
                     return video_url
 

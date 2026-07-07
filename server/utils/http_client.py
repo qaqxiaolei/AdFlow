@@ -22,10 +22,11 @@ HTTP 客户端工厂和管理器
        response = client.get("https://api.example.com/data")
 """
 
+import asyncio
 import ssl
 import certifi
 import httpx
-from typing import Optional, Dict, Any, AsyncGenerator, Generator
+from typing import Optional, Dict, Any, AsyncGenerator, Generator, Tuple
 from contextlib import asynccontextmanager, contextmanager
 import aiohttp
 
@@ -47,8 +48,28 @@ class HttpClient:
         return cls._ssl_context
 
     @classmethod
+    def resolve_proxy(cls) -> Tuple[bool, Optional[str]]:
+        """Resolve proxy settings from app settings.
+
+        Returns:
+            (trust_env, explicit_proxy_url)
+        """
+        try:
+            from services.settings_service import settings_service
+            proxy_setting = settings_service.get_proxy_config()
+        except Exception:
+            proxy_setting = 'system'
+
+        if proxy_setting in ('', 'no_proxy'):
+            return False, None
+        if proxy_setting == 'system':
+            return True, None
+        return False, proxy_setting
+
+    @classmethod
     def _get_client_config(cls, **kwargs: Any) -> Dict[str, Any]:
         """获取 httpx 客户端配置"""
+        trust_env, proxy_url = cls.resolve_proxy()
 
         config = {
             'verify': cls._get_ssl_context(),
@@ -60,13 +81,22 @@ class HttpClient:
             **kwargs,
         }
 
+        if proxy_url:
+            config['proxy'] = proxy_url
+        elif trust_env:
+            config['trust_env'] = True
+
         return config
 
     @classmethod
     def _get_aiohttp_config(
-        cls, trust_env: bool = True, **kwargs: Any
+        cls, trust_env: Optional[bool] = None, **kwargs: Any
     ) -> Dict[str, Any]:
         """获取 aiohttp 客户端配置"""
+        resolved_trust_env, proxy_url = cls.resolve_proxy()
+        if trust_env is None:
+            trust_env = resolved_trust_env or proxy_url is not None
+
         config = {
             'connector': aiohttp.TCPConnector(
                 ssl=cls._get_ssl_context(),
@@ -74,12 +104,68 @@ class HttpClient:
                 limit_per_host=50,
                 keepalive_timeout=0,
             ),
-            'timeout': aiohttp.ClientTimeout(total=300),
-            'trust_env': trust_env,  # 启用环境变量代理支持
+            'timeout': aiohttp.ClientTimeout(total=300, connect=60, sock_connect=60),
+            'trust_env': trust_env,
             **kwargs,
         }
 
+        if proxy_url:
+            config['_explicit_proxy'] = proxy_url
+
         return config
+
+    @classmethod
+    def _is_retryable_network_error(cls, error: Exception) -> bool:
+        message = str(error).lower()
+        retryable_markers = (
+            'timeout',
+            'timed out',
+            'connection',
+            'connect',
+            '信号灯超时',
+            'network',
+            'temporarily unavailable',
+            '503',
+            '502',
+            '504',
+        )
+        return any(marker in message for marker in retryable_markers)
+
+    @classmethod
+    async def download_bytes(
+        cls,
+        url: str,
+        *,
+        max_retries: int = 5,
+        timeout: Optional[httpx.Timeout] = None,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> bytes:
+        """Download remote content with proxy support and retries."""
+        if timeout is None:
+            timeout = httpx.Timeout(600.0, connect=60.0)
+
+        last_error: Optional[Exception] = None
+
+        for attempt in range(max_retries):
+            try:
+                async with cls.create(timeout=timeout) as client:
+                    response = await client.get(url, headers=headers or {})
+                    response.raise_for_status()
+                    return response.content
+            except Exception as error:
+                last_error = error
+                if attempt >= max_retries - 1 or not cls._is_retryable_network_error(error):
+                    break
+                wait_seconds = min(5 * (2 ** attempt), 30)
+                print(
+                    f"⚠️ Download attempt {attempt + 1}/{max_retries} failed for {url}: {error}. "
+                    f"Retrying in {wait_seconds}s..."
+                )
+                await asyncio.sleep(wait_seconds)
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError(f"Failed to download content from {url}")
 
     # ========== 工厂方法 ==========
 

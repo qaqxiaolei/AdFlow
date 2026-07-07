@@ -17,23 +17,23 @@ from models.config_model import ModelInfo
 
 async def handle_chat(data: Dict[str, Any]) -> None:
     """
-    Handle an incoming chat request.
+    处理前端发来的聊天请求
 
     Workflow:
-    - Parse incoming chat data.
-    - Optionally inject system prompt.
-    - Save chat session and messages to the database.
-    - Launch langgraph_agent task to process chat.
-    - Manage stream task lifecycle (add, remove).
-    - Notify frontend via WebSocket when stream is done.
+    - 解析前端传过来的聊天请求数据包.
+    - 可选注入系统提示词.
+    - 保存聊天会话和消息到数据库中.
+    - 启动 langgraph 代理任务来处理聊天请求.
+    - 管理流任务生命周期 (添加, 移除).
+    - 通过 WebSocket 通知前端流任务完成.
 
     Args:
-        data (dict): Chat request data containing:
-            - messages: list of message dicts
-            - session_id: unique session identifier
-            - canvas_id: canvas identifier (contextual use)
-            - text_model: text model configuration
-            - tool_list: list of tool model configurations (images/videos)
+        data (dict): 前端传过来的聊天请求数据包，包含以下字段：:
+            - messages: 聊天消息列表
+            - session_id: 唯一会话标识符
+            - canvas_id: 画布标识符（上下文使用）
+            - text_model: 文本模型配置信息
+            - tool_list: 工具模型配置列表
     """
     # Extract fields from incoming data
     messages: List[Dict[str, Any]] = data.get('messages', [])
