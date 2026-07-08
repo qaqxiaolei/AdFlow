@@ -30,8 +30,7 @@ class AgentManager:
         Returns:
             List[Any]: 创建好的智能体列表
         """
-        # 为不同类型的智能体过滤合适的工具
-        image_tools =  [tool for tool in tool_list if tool.get('type') == 'image']
+        image_tools = [tool for tool in tool_list if tool.get('type') == 'image']
         video_tools = [tool for tool in tool_list if tool.get('type') == 'video']
         search_tools = [tool for tool in tool_list if tool.get('type') == 'search']
 
@@ -40,20 +39,9 @@ class AgentManager:
         print(f"🔍 搜索工具: {search_tools}")
 
         planner_config = PlannerAgentConfig()
+        planner_config.tools = [{'id': 'write_plan', 'provider': 'system'}] + video_tools
         planner_agent = AgentManager._create_langgraph_agent(
             model, planner_config)
-
-        # image_designer_config = ImageDesignerAgentConfig(
-        #     image_tools, system_prompt)
-        # print('👇image_designer_config tools', image_designer_config.tools)
-        # print('👇image_designer_config system_prompt', image_designer_config.system_prompt)
-        # image_designer_agent = AgentManager._create_langgraph_agent(
-        #     model, image_designer_config)
-
-        # video_designer_config = VideoDesignerAgentConfig(
-        #     video_tools)
-        # video_designer_agent = AgentManager._create_langgraph_agent(
-        #     model, video_designer_config)
 
         image_video_creator_config = ImageVideoCreatorAgentConfig(tool_list)
         image_video_creator_agent = AgentManager._create_langgraph_agent(

@@ -11,6 +11,7 @@ from utils.http_client import HttpClient
 from models.config_model import ModelInfo
 from typing import List
 from services.tool_service import TOOL_MAPPING
+from fastapi import Request
 
 router = APIRouter(prefix="/api")
 
@@ -131,10 +132,18 @@ async def list_tools() -> list[ToolInfoJson]:
 
 
 @router.get("/list_chat_sessions")
-async def list_chat_sessions():
-    return await db_service.list_sessions()
+async def list_chat_sessions(canvas_id: str = None):
+    return await db_service.list_sessions(canvas_id)
 
 
 @router.get("/chat_session/{session_id}")
 async def get_chat_session(session_id: str):
     return await db_service.get_chat_history(session_id)
+
+
+@router.post("/chat_session/{session_id}/rename")
+async def rename_chat_session(session_id: str, request: Request):
+    data = await request.json()
+    title = data.get('title')
+    await db_service.update_session_title(session_id, title)
+    return {"session_id": session_id, "title": title}

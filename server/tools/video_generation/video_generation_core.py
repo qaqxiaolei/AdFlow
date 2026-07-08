@@ -27,6 +27,7 @@ async def generate_video_with_provider(
     config: Any,
     input_images: Optional[list[str]] = None,
     camera_fixed: bool = True,
+    ratio: str = "",
     **kwargs: Any
 ) -> str:
     """
@@ -42,6 +43,7 @@ async def generate_video_with_provider(
         config: Context runtime configuration containing canvas_id, session_id, model_info, injected by langgraph
         input_images: Optional input reference images list
         camera_fixed: Whether to keep camera fixed
+        ratio: Video ratio, same as aspect_ratio. If not provided, aspect_ratio is used.
 
     Returns:
         str: Generation result message

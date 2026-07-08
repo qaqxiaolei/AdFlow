@@ -57,6 +57,21 @@ DEFAULT_PROVIDERS_CONFIG: AppConfig = {
         'api_key': '',
         'max_tokens': 8192,
     },
+    'search': {
+        'bilibili': {
+            'enabled': True,
+            'base_url': 'https://api.bilibili.com',
+            'cookie': '',
+        },
+        'xiaohongshu': {
+            'enabled': False,
+            'cookie': '',
+        },
+        'douyin': {
+            'enabled': False,
+            'cookie': '',
+        },
+    },
 }
 
 SERVER_DIR = os.path.dirname(os.path.dirname(__file__))

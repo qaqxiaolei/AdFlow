@@ -78,6 +78,24 @@ class DatabaseService:
             """, (id, model, provider, canvas_id, title))
             await db.commit()
 
+    async def update_session_title(self, session_id: str, title: str):
+        """更新聊天会话的标题，同时更新对应的 canvas name"""
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
+            
+            await db.execute("""
+                UPDATE chat_sessions SET title = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE id = ?
+            """, (title, session_id))
+            
+            await db.execute("""
+                UPDATE canvases SET name = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE session_id = ?
+            """, (title, session_id))
+            
+            await db.commit()
+
     async def create_message(self, session_id: str, role: str, message: str):
         """创建一个聊天消息"""
         async with aiosqlite.connect(self.db_path, timeout=30) as db:

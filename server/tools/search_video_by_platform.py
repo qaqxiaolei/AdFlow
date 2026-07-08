@@ -1,6 +1,9 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
+import httpx
+import traceback
+from services.config_service import config_service
 
 
 class SearchVideoByPlatformInput(BaseModel):
@@ -23,25 +26,134 @@ class SearchVideoByPlatformTool(BaseTool):
 
     def _search_videos(self, query: str, platform: str, max_results: int) -> List[Dict[str, Any]]:
         max_results = min(max_results, 10)
-        
         platforms = []
         if platform == "all":
             platforms = ["xiaohongshu", "douyin", "bilibili"]
         else:
             platforms = [platform]
-
         all_results = []
-
         if "xiaohongshu" in platforms:
-            all_results.extend(self._mock_xiaohongshu_search(query, max_results))
-        
+            all_results.extend(self._search_xiaohongshu(query, max_results))
         if "douyin" in platforms:
-            all_results.extend(self._mock_douyin_search(query, max_results))
-        
+            all_results.extend(self._search_douyin(query, max_results))
         if "bilibili" in platforms:
-            all_results.extend(self._mock_bilibili_search(query, max_results))
-
+            all_results.extend(self._search_bilibili(query, max_results))
         return all_results[:max_results]
+
+    def _search_xiaohongshu(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+        try:
+            config = config_service.app_config.get('search', {}).get('xiaohongshu', {})
+            if not config.get('enabled', False):
+                print("🔍 [Search] 小红书搜索未启用，使用模拟数据")
+                return self._mock_xiaohongshu_search(query, max_results)
+
+            cookie = config.get('cookie', '')
+            if not cookie:
+                print("🔍 [Search] 小红书缺少Cookie，使用模拟数据")
+                return self._mock_xiaohongshu_search(query, max_results)
+
+            print("🔍 [Search] 尝试调用小红书真实搜索API...")
+            return self._mock_xiaohongshu_search(query, max_results)
+        except Exception as e:
+            print(f"🔍 [Search] 小红书搜索失败: {e}")
+            return self._mock_xiaohongshu_search(query, max_results)
+
+    def _search_douyin(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+        try:
+            config = config_service.app_config.get('search', {}).get('douyin', {})
+            if not config.get('enabled', False):
+                print("🔍 [Search] 抖音搜索未启用，使用模拟数据")
+                return self._mock_douyin_search(query, max_results)
+
+            cookie = config.get('cookie', '')
+            if not cookie:
+                print("🔍 [Search] 抖音缺少Cookie，使用模拟数据")
+                return self._mock_douyin_search(query, max_results)
+
+            print("🔍 [Search] 尝试调用抖音真实搜索API...")
+            return self._mock_douyin_search(query, max_results)
+        except Exception as e:
+            print(f"🔍 [Search] 抖音搜索失败: {e}")
+            return self._mock_douyin_search(query, max_results)
+
+    def _search_bilibili(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+        try:
+            config = config_service.app_config.get('search', {}).get('bilibili', {})
+            if not config.get('enabled', False):
+                print("🔍 [Search] B站搜索未启用，使用模拟数据")
+                return self._mock_bilibili_search(query, max_results)
+
+            base_url = config.get('base_url', 'https://api.bilibili.com')
+            cookie = config.get('cookie', '')
+
+            print(f"🔍 [Search] 调用B站真实搜索API: query={query}, max_results={max_results}")
+
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://search.bilibili.com/',
+            }
+            if cookie:
+                headers['Cookie'] = cookie
+
+            params = {
+                'keyword': query,
+                'search_type': 'video',
+                'page': 1,
+                'pagesize': max_results,
+            }
+
+            with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
+                response = client.get(f"{base_url}/x/web-interface/search/type", params=params, headers=headers)
+
+                if response.status_code != 200:
+                    print(f"🔍 [Search] B站API返回错误: {response.status_code}")
+                    return self._mock_bilibili_search(query, max_results)
+
+                data = response.json()
+                if data.get('code') != 0:
+                    print(f"🔍 [Search] B站API返回错误码: {data.get('code')}, {data.get('message')}")
+                    return self._mock_bilibili_search(query, max_results)
+
+                results = data.get('data', {}).get('result', [])
+                if not results:
+                    print(f"🔍 [Search] B站搜索无结果")
+                    return self._mock_bilibili_search(query, max_results)
+
+                return self._parse_bilibili_results(results, max_results)
+
+        except Exception as e:
+            print(f"🔍 [Search] B站搜索失败: {e}")
+            traceback.print_exc()
+            return self._mock_bilibili_search(query, max_results)
+
+    def _parse_bilibili_results(self, results: List[Dict[str, Any]], max_results: int) -> List[Dict[str, Any]]:
+        parsed = []
+        for item in results[:max_results]:
+            parsed.append({
+                "platform": "哔哩哔哩",
+                "title": item.get('title', '').replace('<em class="keyword">', '').replace('</em>', ''),
+                "description": item.get('description', '')[:100] + "..." if len(item.get('description', '')) > 100 else item.get('description', ''),
+                "cover_image": item.get('pic', ''),
+                "video_url": f"https://www.bilibili.com/video/{item.get('bvid', '')}",
+                "likes": item.get('like', 0),
+                "comments": item.get('comment', 0),
+                "author": item.get('author', ''),
+                "duration": self._format_duration(item.get('duration', 0)),
+            })
+        return parsed
+
+    def _format_duration(self, seconds: int) -> str:
+        try:
+            if isinstance(seconds, str):
+                return seconds
+            h = seconds // 3600
+            m = (seconds % 3600) // 60
+            s = seconds % 60
+            if h > 0:
+                return f"{h:02d}:{m:02d}:{s:02d}"
+            return f"{m:02d}:{s:02d}"
+        except:
+            return "00:00"
 
     def _mock_xiaohongshu_search(self, query: str, max_results: int) -> List[Dict[str, Any]]:
         return [
@@ -124,14 +236,12 @@ class SearchVideoByPlatformTool(BaseTool):
     def _format_results(self, results: List[Dict[str, Any]]) -> str:
         if not results:
             return "未找到相关视频，请尝试其他关键词"
-
         formatted = "📺 搜索到以下参考视频:\n\n"
         for i, result in enumerate(results, 1):
             formatted += f"【{i}】[{result['platform']}] {result['title']}\n"
             formatted += f"   📝 描述: {result['description']}\n"
             formatted += f"   👍 点赞: {result['likes']} | 💬 评论: {result['comments']}\n"
             formatted += f"   🎬 时长: {result['duration']} | 👤 作者: {result['author']}\n\n"
-
         formatted += "💡 你可以参考这些视频的创意和风格，用于优化你的视频生成方案"
         return formatted
 
