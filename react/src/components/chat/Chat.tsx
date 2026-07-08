@@ -566,6 +566,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                 sessionList={sessionList}
                                 onClickNewChat={onClickNewChat}
                                 onSelectSession={onSelectSession}
+                                canvasId={canvasId}
+                                onSetSessionList={setSessionList}
                             />
                         </div>
                         {/* Share Template Button */}

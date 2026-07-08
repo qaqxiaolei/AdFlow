@@ -2,7 +2,7 @@ import ChatInterface from '@/components/chat/Chat'
 import TopMenu from '@/components/TopMenu'
 import { Session } from '@/types/types'
 import { createFileRoute, useParams, useSearch } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export const Route = createFileRoute('/canvas/$id')({
     component: Canvas,
@@ -15,6 +15,21 @@ function Canvas() {
         sessionId: string
     }
     const searchSessionId = search?.sessionId || ''
+
+    useEffect(() => {
+        const fetchSessions = async () => {
+            try {
+                const response = await fetch('/api/canvas/' + id)
+                const data = await response.json()
+                if (data.sessions) {
+                    setSessionList(data.sessions)
+                }
+            } catch (error) {
+                console.error('Failed to fetch sessions:', error)
+            }
+        }
+        fetchSessions()
+    }, [id])
 
     return (
         <div className='flex flex-col h-full'>

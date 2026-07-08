@@ -39,3 +39,12 @@ export const cancelChat = async (sessionId: string) => {
   })
   return await response.json()
 }
+
+export const renameChatSession = async (sessionId: string, title: string) => {
+  const response = await fetch(`/api/chat_session/${sessionId}/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  return await response.json()
+}
