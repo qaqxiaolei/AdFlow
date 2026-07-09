@@ -113,6 +113,22 @@ async def save_video_to_canvas(
         return filename, file_data, new_video_element
 
 
+async def send_tool_call_progress(
+    session_id: str,
+    tool_call_id: str,
+    update: str,
+) -> None:
+    """Push tool progress text to chat UI (ToolcallProgressUpdate)."""
+    if not session_id or not tool_call_id:
+        return
+    await send_to_websocket(session_id, {
+        "type": "tool_call_progress",
+        "session_id": session_id,
+        "tool_call_id": tool_call_id,
+        "update": update,
+    })
+
+
 async def send_video_start_notification(session_id: str, message: str) -> None:
     """Send WebSocket notification about video generation start"""
     await send_to_websocket(session_id, {
@@ -187,7 +203,8 @@ async def process_video_result(
     video_url: str,
     session_id: str,
     canvas_id: str,
-    provider_name: str = ""
+    provider_name: str = "",
+    tool_call_id: str = "",
 ) -> str:
     """
     Complete video processing pipeline: save, update canvas, notify
@@ -202,6 +219,9 @@ async def process_video_result(
         Success message with video link
     """
     try:
+        await send_tool_call_progress(
+            session_id, tool_call_id, "视频云端生成完成，正在下载并保存..."
+        )
         # Save video to canvas and get file info
         filename, file_data, new_video_element = await save_video_to_canvas(
             session_id=session_id,
@@ -220,6 +240,7 @@ async def process_video_result(
 
         provider_info = f" using {provider_name}" if provider_name else ""
         print(f"🎥 Video generation completed{provider_info}: {filename}")
+        await send_tool_call_progress(session_id, tool_call_id, "")
         return format_video_success_message(filename)
 
     except Exception as e:

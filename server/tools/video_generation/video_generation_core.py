@@ -13,6 +13,7 @@ from ..video_providers.agnes_provider import AgnesVideoProvider  # type: ignore
 from .video_canvas_utils import (
     send_video_start_notification,
     send_video_error_notification,
+    send_tool_call_progress,
     process_video_result,
 )
 
@@ -84,6 +85,9 @@ async def generate_video_with_provider(
             session_id,
             f"Starting video generation using {model_name} via {provider_name}..."
         )
+        await send_tool_call_progress(
+            session_id, tool_call_id, "正在提交视频生成任务..."
+        )
 
         # Process input images for the provider
         processed_input_images = None
@@ -101,6 +105,8 @@ async def generate_video_with_provider(
             aspect_ratio=aspect_ratio,
             input_images=processed_input_images,
             camera_fixed=camera_fixed,
+            session_id=session_id,
+            tool_call_id=tool_call_id,
             **kwargs
         )
 
@@ -109,7 +115,8 @@ async def generate_video_with_provider(
             video_url=video_url,
             session_id=session_id,
             canvas_id=canvas_id,
-            provider_name=f"{model_name} ({provider_name})"
+            provider_name=f"{model_name} ({provider_name})",
+            tool_call_id=tool_call_id,
         )
 
     except Exception as e:

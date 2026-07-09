@@ -378,6 +378,40 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         [canvasId, sessionId]
     )
 
+    const handleVideoGenerated = useCallback(
+        (data: TEvents['Socket::Session::VideoGenerated']) => {
+            if (data.session_id && data.session_id !== sessionId) {
+                return
+            }
+            const videoUrl = data.video_url || data.file?.dataURL
+            if (!videoUrl) {
+                return
+            }
+
+            setMessages(
+                produce((prev) => {
+                    const duplicate = prev.some(
+                        (m) =>
+                            m.role === 'assistant' &&
+                            typeof m.content === 'string' &&
+                            m.content.includes(videoUrl)
+                    )
+                    if (duplicate) {
+                        return
+                    }
+
+                    prev.push({
+                        role: 'assistant',
+                        content: `![video_id: generated](${videoUrl})`,
+                    })
+                })
+            )
+            setPending('tool')
+            scrollToBottom()
+        },
+        [sessionId, scrollToBottom]
+    )
+
     const handleAllMessages = useCallback(
         (data: TEvents['Socket::Session::AllMessages']) => {
             if (data.session_id && data.session_id !== sessionId) {
@@ -454,6 +488,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         eventBus.on('Socket::Session::ToolCallArguments', handleToolCallArguments)
         eventBus.on('Socket::Session::ToolCallResult', handleToolCallResult)
         eventBus.on('Socket::Session::ImageGenerated', handleImageGenerated)
+        eventBus.on('Socket::Session::VideoGenerated', handleVideoGenerated)
         eventBus.on('Socket::Session::AllMessages', handleAllMessages)
         eventBus.on('Socket::Session::Done', handleDone)
         eventBus.on('Socket::Session::Error', handleError)
@@ -481,6 +516,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             )
             eventBus.off('Socket::Session::ToolCallResult', handleToolCallResult)
             eventBus.off('Socket::Session::ImageGenerated', handleImageGenerated)
+            eventBus.off('Socket::Session::VideoGenerated', handleVideoGenerated)
             eventBus.off('Socket::Session::AllMessages', handleAllMessages)
             eventBus.off('Socket::Session::Done', handleDone)
             eventBus.off('Socket::Session::Error', handleError)

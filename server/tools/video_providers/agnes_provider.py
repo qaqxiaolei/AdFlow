@@ -26,6 +26,7 @@ from ..agnes_model_config import (
     AGNES_VIDEO_MODEL_DEFAULT,
     is_valid_video_model,
 )
+from ..video_generation.video_canvas_utils import send_tool_call_progress
 
 # Agnes 视频接口限流：约 1 次/分钟
 VIDEO_CREATE_RATE_LIMIT_SECONDS = 62
@@ -178,14 +179,21 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                 seen.add(url)
                 urls.append(url)
 
-        # 与 Apifox 一致：GET /agnesapi?video_id=xxx
+        # 有 video_id 时只轮询 agnesapi（与 Apifox 一致，避免 /videos 返回陈旧 queued 状态）
         if video_id:
             add(build_agnesapi_poll_url(self.base_url, video_id))
+            return urls
         add(build_video_alt_poll_url(self.base_url, task_id))
         add(build_video_poll_url(self.base_url, task_id))
         return urls
 
-    def _get_poll_interval(self, attempt: int) -> float:
+    def _get_poll_interval(self, attempt: int, agnesapi_only: bool = False) -> float:
+        if agnesapi_only:
+            if attempt < 60:
+                return 1.0
+            if attempt < 120:
+                return 1.5
+            return 2.0
         if attempt < 12:
             return 2.0
         if attempt < 30:
@@ -271,8 +279,11 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
         video_id: Optional[str] = None,
         model_name: Optional[str] = None,
         duration: int = 10,
+        session_id: str = "",
+        tool_call_id: str = "",
     ) -> str:
         polling_urls = self._build_poll_urls(task_id, video_id, model_name)
+        agnesapi_only = bool(video_id)
         poll_budget = self._get_poll_budget_seconds(duration)
         max_attempts = self._max_poll_attempts(poll_budget)
         poll_started_at = time.monotonic()
@@ -280,6 +291,7 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
         print(
             f"🎥 [Agnes-Video] 轮询URL列表: {polling_urls}，"
             f"轮询预算: {poll_budget}s（时长 {duration}s）"
+            f"{'，agnesapi 专用模式' if agnesapi_only else ''}"
         )
 
         async with HttpClient.create(
@@ -303,7 +315,9 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                             raise
 
                         if response.status_code == 429:
-                            await asyncio.sleep(self._get_poll_interval(attempt))
+                            await asyncio.sleep(
+                                self._get_poll_interval(attempt, agnesapi_only)
+                            )
                             break
 
                         if response.status_code == 404:
@@ -356,7 +370,14 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                             f"预算 {poll_budget} 秒），请稍后重试"
                         )
 
-                    interval = self._get_poll_interval(attempt)
+                    if attempt % 3 == 0 and session_id:
+                        await send_tool_call_progress(
+                            session_id,
+                            tool_call_id,
+                            f"视频生成中（已等待 {int(elapsed)} 秒）...",
+                        )
+
+                    interval = self._get_poll_interval(attempt, agnesapi_only)
                     if attempt % 4 == 0:
                         print(
                             f"🎥 [Agnes-Video] 任务 {task_id} 仍在处理"
@@ -366,7 +387,9 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                     await asyncio.sleep(interval)
                 except Exception as e:
                     if self._is_transient_network_error(e):
-                        await asyncio.sleep(self._get_poll_interval(attempt))
+                        await asyncio.sleep(
+                            self._get_poll_interval(attempt, agnesapi_only)
+                        )
                         continue
                     raise
 
@@ -551,6 +574,8 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                             video_id=video_id,
                             model_name=current_model,
                             duration=duration,
+                            session_id=kwargs.get("session_id", ""),
+                            tool_call_id=kwargs.get("tool_call_id", ""),
                         )
                         print(f"🎥 [Agnes-Video] 视频生成成功 - 模型: {current_model}, 视频URL: {video_url}")
                         return video_url
