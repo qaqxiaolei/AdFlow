@@ -185,7 +185,12 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
             )
         },
         img: ({ node, children, ...props }) => {
-            const isVideo = props.alt && props.alt.includes('video_id:')
+            const src = typeof props.src === 'string' ? props.src : ''
+            const normalizedSrc = src.match(/\/api\/file\/[^\s?)]+/)?.[0] ?? src
+            const isVideo =
+                (props.alt && props.alt.includes('video_id:')) ||
+                /\.mp4(\?|$)/i.test(src) ||
+                /\/api\/file\/vi_/i.test(src)
 
             if (isVideo) {
                 return (
@@ -194,7 +199,7 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
                             className="w-full max-w-full h-auto rounded-md cursor-pointer group-hover:scale-105 transition-transform duration-300"
                             controls
                             preload="metadata"
-                            src={props.src}
+                            src={normalizedSrc}
                             {...(props.alt && { title: props.alt })}
                         >
                             Your browser does not support the video tag.

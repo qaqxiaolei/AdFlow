@@ -23,13 +23,11 @@ const ChatMagicGenerator: React.FC<ChatMagicGeneratorProps> = ({
     setPending,
     scrollToBottom
 }) => {
-    const { setShowLoginDialog } = useConfigs()
     const { authStatus } = useAuth()
 
     const handleMagicGenerate = useCallback(
         async (data: TCanvasMagicGenerateEvent) => {
             if (!authStatus.is_logged_in) {
-                setShowLoginDialog(true)
                 return
             }
 
@@ -75,7 +73,7 @@ const ChatMagicGenerator: React.FC<ChatMagicGeneratorProps> = ({
                 setPending(false)
             }
         },
-        [sessionId, canvasId, messages, setMessages, setPending, scrollToBottom, authStatus.is_logged_in, setShowLoginDialog]
+        [sessionId, canvasId, messages, setMessages, setPending, scrollToBottom, authStatus.is_logged_in]
     )
 
     useEffect(() => {

@@ -19,7 +19,6 @@ export const ConfigsProvider = ({
     setTextModel,
     setSelectedTools,
     setAllTools,
-    setShowLoginDialog,
   } = configsStore
 
   // 存储上一次的 allTools 值，用于检测新添加的工具，并自动选中
@@ -73,18 +72,12 @@ export const ConfigsProvider = ({
     }
 
     setSelectedTools(currentSelectedTools)
-
-    // 如果文本模型或工具模型为空，则显示登录对话框
-    if (llmModels.length === 0 || toolList.length === 0) {
-      setShowLoginDialog(true)
-    }
   }, [
     modelList,
     setSelectedTools,
     setTextModel,
     setTextModels,
     setAllTools,
-    setShowLoginDialog,
   ])
 
   return (

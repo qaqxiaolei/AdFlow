@@ -63,7 +63,7 @@ function Home() {
           </motion.div>
 
           <ChatTextarea
-            className='w-full max-w-xl'
+            className='w-full px-4 max-w-xl'
             messages={[]}
             onSendMessages={(messages, configs) => {
               createCanvasMutation({

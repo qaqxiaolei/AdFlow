@@ -411,6 +411,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     const handleError = useCallback((data: TEvents['Socket::Session::Error']) => {
         setPending(false)
+        // 视频生成类错误已在对话中由 AI 说明，不再弹红色阻断提示
+        if (
+            /视频生成|video generation/i.test(data.error) &&
+            /超时|较长|稍后重试|过于频繁|failed/i.test(data.error)
+        ) {
+            return
+        }
         toast.error('Error: ' + data.error, {
             closeButton: true,
             duration: 3600 * 1000,
@@ -555,11 +562,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     return (
         <PhotoProvider>
-            <div className='flex flex-col flex-1 relative w-full'>
-                {/* 桌面端卡片式容器 */}
+            <div className='flex flex-col flex-1 relative w-full h-full'>
                 <div className='flex flex-col w-full h-full lg:mx-auto lg:w-[80%] lg:h-[calc(100vh-2rem-32px)] lg:rounded-2xl lg:shadow-xl lg:border lg:border-border overflow-hidden'>
-                    {/* Chat messages */}
-                    <header className='flex items-center px-3 py-3 relative z-10 bg-background/80 backdrop-blur-sm border-b border-border/50'>
+                    <header className='flex items-center px-3 py-2 sm:px-4 sm:py-3 relative z-10 bg-background/80 backdrop-blur-sm border-b border-border/50'>
                         <div className='flex-1 min-w-0'>
                             <SessionSelector
                                 session={session}
@@ -570,28 +575,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                 onSetSessionList={setSessionList}
                             />
                         </div>
-                        {/* Share Template Button */}
-                        {/* {authStatus.is_logged_in && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-2 shrink-0"
-              onClick={() => setShowShareDialog(true)}
-            >
-              <Share2 className="h-4 w-4 mr-1" />
-            </Button>
-          )} */}
 
                         <Blur className='absolute top-0 left-0 right-0 h-full -z-1' />
                     </header>
 
                     <ScrollArea className='flex-1 min-h-0' viewportRef={scrollRef}>
                         {messages.length > 0 ? (
-                            <div className='flex flex-col flex-1 px-4 py-4'>
-                                {/* Messages */}
+                            <div className='flex flex-col flex-1 px-3 py-3 sm:px-4 sm:py-4'>
                                 {messages.map((message, idx) => (
-                                    <div key={`${idx}`} className='flex flex-col gap-4 mb-2'>
-                                        {/* Regular message content */}
+                                    <div key={`${idx}`} className='flex flex-col gap-3 sm:gap-4 mb-2'>
                                         {typeof message.content == 'string' &&
                                             (message.role !== 'tool' ? (
                                                 <MessageRegular
@@ -610,7 +602,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                                 />
                                             ))}
 
-                                        {/* 混合内容消息的文本部分 - 显示在聊天框内 */}
                                         {Array.isArray(message.content) && (
                                             <>
                                                 <MixedContentImages
@@ -707,7 +698,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         )}
                     </ScrollArea>
 
-                    <div className='relative p-3 gap-3 bg-background border-t border-border z-50'>
+                    <div className='relative px-3 py-2 sm:p-3 gap-3 bg-background border-t border-border z-50'>
                         <ChatTextarea
                             sessionId={sessionId!}
                             pending={!!pending}

@@ -72,6 +72,13 @@ export const NotificationPanel: React.FC = () => {
       return
     }
 
+    if (
+      /视频生成|video generation/i.test(data.error) &&
+      /超时|较长|稍后重试|过于频繁|failed/i.test(data.error)
+    ) {
+      return
+    }
+
     toast.error('Error: ' + data.error, {
       closeButton: true,
       duration: 3600 * 1000,

@@ -19,7 +19,6 @@ export default function JaazSetting({
 }: JaazSettingProps) {
   const { t } = useTranslation()
   const { authStatus } = useAuth()
-  const { setShowLoginDialog } = useConfigs()
 
   // Get available models from constants
   const availableModels = config.models || {}
@@ -102,16 +101,7 @@ export default function JaazSetting({
           {/* <span>✨ Custom Provider</span> */}
         </div>
 
-        {/* Show login button if not logged in */}
-        {!authStatus.is_logged_in && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowLoginDialog(true)}
-          >
-            {t('common:auth.login')}
-          </Button>
-        )}
+
       </div>
 
       {/* Only show configuration when logged in */}

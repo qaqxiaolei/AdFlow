@@ -66,7 +66,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
 }) => {
   const { t } = useTranslation()
   const { authStatus } = useAuth()
-  const { textModel, selectedTools, setShowLoginDialog } = useConfigs()
+  const { textModel, selectedTools } = useConfigs()
   const { balance } = useBalance()
   const [prompt, setPrompt] = useState('')
   const textareaRef = useRef<TextAreaRef>(null)
@@ -169,9 +169,6 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }
     if (!textModel) {
       toast.error(t('chat:textarea.selectModel'))
-      if (!authStatus.is_logged_in) {
-        setShowLoginDialog(true)
-      }
       return
     }
     if (!selectedTools || selectedTools.length === 0) {
@@ -247,7 +244,6 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     selectedAspectRatio,
     quantity,
     authStatus.is_logged_in,
-    setShowLoginDialog,
     balance,
     RechargeContent,
   ])

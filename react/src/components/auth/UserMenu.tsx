@@ -18,7 +18,6 @@ import { PointsDisplay } from './PointsDisplay'
 
 export function UserMenu() {
   const { authStatus, refreshAuth } = useAuth()
-  const { setShowLoginDialog } = useConfigs()
   const refreshModels = useRefreshModels()
   const { t } = useTranslation()
 
