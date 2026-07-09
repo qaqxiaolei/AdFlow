@@ -28,6 +28,7 @@ async def generate_video_with_provider(
     input_images: Optional[list[str]] = None,
     camera_fixed: bool = True,
     ratio: str = "",
+    notify_on_error: bool = True,
     **kwargs: Any
 ) -> str:
     """
@@ -119,8 +120,12 @@ async def generate_video_with_provider(
         print(f"🎥 Context info - canvas_id: {canvas_id}, session_id: {session_id}")
         print(f"🎥 Generation params - prompt: {prompt[:100]}..., resolution: {resolution}, duration: {duration}, aspect_ratio: {aspect_ratio}")
 
-        # Send error notification
-        await send_video_error_notification(session_id, error_message)
+        # 批量生成时部分失败由工具结果汇总告知，避免重复弹红色错误
+        await send_video_error_notification(
+            session_id,
+            error_message,
+            notify_user=notify_on_error,
+        )
 
         # Re-raise the exception for proper error handling
         raise Exception(

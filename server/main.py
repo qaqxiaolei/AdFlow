@@ -11,6 +11,7 @@ from routers import config_router, image_router, root_router, workspace, canvas,
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import argparse
 from contextlib import asynccontextmanager
 from starlette.types import Scope
@@ -33,17 +34,84 @@ async def initialize():
 
 root_dir = os.path.dirname(__file__)
 
+async def _warmup_agents():
+    """预热智能体缓存，减少首次请求延迟"""
+    try:
+        from services.langgraph_service.agent_cache import agent_cache
+        from services.langgraph_service.agent_service import _create_text_model
+        from services.langgraph_service.agent_manager import AgentManager
+
+        print('🔥 开始预热智能体缓存...')
+
+        config = config_service.get_config()
+        ollama_url = config.get('ollama', {}).get('url', '')
+        openai_url = config.get('openai', {}).get('url', '')
+
+        if ollama_url:
+            first_model = {
+                'provider': 'ollama',
+                'model': 'llama3.1',
+                'url': ollama_url,
+                'type': 'text'
+            }
+            model_instance = _create_text_model(first_model)
+            agent_cache.set_model(first_model, model_instance)
+            print(f'✅ 预热模型: ollama/{first_model["model"]}')
+
+            tool_list = [
+                {'id': 'write_plan', 'provider': 'system', 'type': 'system'},
+                {'id': 'search_video_by_platform', 'provider': 'system', 'type': 'search'},
+                {'id': 'generate_image_by_agnes', 'provider': 'agnes', 'type': 'image'},
+                {'id': 'generate_video_by_agnes', 'provider': 'agnes', 'type': 'video'},
+            ]
+            agents = AgentManager.create_agents(model_instance, tool_list)
+            agent_cache.set_agents(first_model, tool_list, agents)
+            print(f'✅ 预热智能体: {[a.name for a in agents]}')
+        elif openai_url:
+            first_model = {
+                'provider': 'openai',
+                'model': 'gpt-4o',
+                'url': openai_url,
+                'type': 'text'
+            }
+            model_instance = _create_text_model(first_model)
+            agent_cache.set_model(first_model, model_instance)
+            print(f'✅ 预热模型: openai/{first_model["model"]}')
+
+            tool_list = [
+                {'id': 'write_plan', 'provider': 'system', 'type': 'system'},
+                {'id': 'search_video_by_platform', 'provider': 'system', 'type': 'search'},
+                {'id': 'generate_image_by_agnes', 'provider': 'agnes', 'type': 'image'},
+                {'id': 'generate_video_by_agnes', 'provider': 'agnes', 'type': 'video'},
+            ]
+            agents = AgentManager.create_agents(model_instance, tool_list)
+            agent_cache.set_agents(first_model, tool_list, agents)
+            print(f'✅ 预热智能体: {[a.name for a in agents]}')
+
+        print('🔥 智能体缓存预热完成')
+    except Exception as e:
+        print(f'⚠️ 预热失败（不影响正常使用）: {e}')
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # onstartup
-    # TODO: Check if there will be racing conditions when user send chat request but tools and models are not initialized yet.
     await initialize()
     await tool_service.initialize()
+    await _warmup_agents()
     yield
     # onshutdown
 
 print('Creating FastAPI app')
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include routers
 print('Including routers')
@@ -106,7 +174,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         socket_app,
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=args.port,
         timeout_keep_alive=600
     )

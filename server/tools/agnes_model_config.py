@@ -36,7 +36,6 @@ AGNES_IMAGE_MODEL_DEFAULT: str = AGNES_IMAGE_MODELS[0]
 # ==================== 视频模型配置 ====================
 AGNES_VIDEO_MODELS: List[str] = [
     "agnes-video-v2.0",
-    "agnes-video-v1.0",
 ]
 """
 Agnes 视频生成模型列表（按优先级排序）

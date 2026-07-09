@@ -11,14 +11,19 @@ Agnes API 路由常量定义
     api_url = f"{base_url}{AGNES_IMAGE_API_ROUTE}"
 """
 
+from typing import Optional
+
 AGNES_IMAGE_API_ROUTE = "/images/generations"
 """图片生成接口路由"""
 
-AGNES_VIDEO_API_ROUTE = "/videos"
-"""视频生成接口路由"""
+AGNES_VIDEO_API_ROUTE = "/video/generations"
+"""视频生成接口路由（OpenAI兼容格式）"""
 
-AGNES_VIDEO_POLL_ROUTE = "/videos/{task_id}"
+AGNES_VIDEO_POLL_ROUTE = "/video/generations/{task_id}"
 """视频任务状态轮询接口路由"""
+
+AGNES_VIDEO_ALT_POLL_ROUTE = "/videos/{task_id}"
+"""视频任务状态轮询备用接口路由（OpenAI videos 格式）"""
 
 AGNES_AGNESAPI_POLL_ROUTE = "/agnesapi"
 """视频任务状态轮询备用接口路由（使用 video_id）"""
@@ -67,6 +72,25 @@ def build_video_poll_url(base_url: str, task_id: str) -> str:
     return f"{clean_base}{AGNES_VIDEO_POLL_ROUTE.format(task_id=task_id)}"
 
 
+def build_video_alt_poll_url(base_url: str, task_id: str) -> str:
+    """构建 /videos/{task_id} 格式的轮询 URL"""
+    clean_base = base_url.rstrip("/")
+    return f"{clean_base}{AGNES_VIDEO_ALT_POLL_ROUTE.format(task_id=task_id)}"
+
+
+def build_agnesapi_poll_url(
+    base_url: str,
+    video_id: str,
+    model_name: Optional[str] = None,
+) -> str:
+    """构建 /agnesapi?video_id=... 格式的轮询 URL（与 Apifox 一致）"""
+    api_root = get_api_root(base_url)
+    url = f"{api_root}{AGNES_AGNESAPI_POLL_ROUTE}?video_id={video_id}"
+    if model_name:
+        url += f"&model_name={model_name}"
+    return url
+
+
 def get_api_root(base_url: str) -> str:
     """
     获取 API 根地址（移除 /v1 后缀）
@@ -87,9 +111,12 @@ __all__ = [
     "AGNES_IMAGE_API_ROUTE",
     "AGNES_VIDEO_API_ROUTE",
     "AGNES_VIDEO_POLL_ROUTE",
+    "AGNES_VIDEO_ALT_POLL_ROUTE",
     "AGNES_AGNESAPI_POLL_ROUTE",
     "build_image_api_url",
     "build_video_api_url",
     "build_video_poll_url",
+    "build_video_alt_poll_url",
+    "build_agnesapi_poll_url",
     "get_api_root",
 ]

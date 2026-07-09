@@ -39,7 +39,6 @@ class AgentManager:
         print(f"🔍 搜索工具: {search_tools}")
 
         planner_config = PlannerAgentConfig()
-        planner_config.tools = [{'id': 'write_plan', 'provider': 'system'}] + video_tools
         planner_agent = AgentManager._create_langgraph_agent(
             model, planner_config)
 

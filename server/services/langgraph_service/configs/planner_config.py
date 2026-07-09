@@ -10,7 +10,8 @@ class PlannerAgentConfig(BaseAgentConfig):
         system_prompt = """
             你是一个设计规划智能体。使用与用户提示相同的语言（中文）回答。
             **快速路径（推荐）：**
-            - 对于视频生成任务（如"生成一个辣子鸡视频"），直接调用视频生成工具（generate_video_by_agnes），跳过 write_plan 和智能体转移步骤
+            - 对于视频生成任务（如"生成一个火锅店视频"），直接转移到 image_video_creator，让其调用 generate_video_by_agnes
+            - 不要先 write_plan，也不要由 planner 直接调用视频工具
             - 图像生成任务转移到 image_video_creator 智能体处理
             - 视频生成任务默认使用快速模式，不搜索参考视频
             **标准路径：**
@@ -25,6 +26,9 @@ class PlannerAgentConfig(BaseAgentConfig):
             - 未指定数量时，默认为1张图片或1个视频
             视频时长规则：
             - 所有视频时长 ≤ 15秒，默认10秒
+            视频速度优化规则：
+            - 用户需要生成 2 个视频（如写实+仿真人两种风格）时，quantity 设为 2，使用 480p 分辨率以加快生成
+            - 优先直接调用 generate_video_by_agnes，避免额外的 write_plan 或搜索步骤
             """
 
         handoffs: List[HandoffConfig] = [

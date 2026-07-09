@@ -1,4 +1,4 @@
-#server/routers/chat_router.py
+# server/routers/chat_router.py
 from fastapi import APIRouter, Request
 from services.chat_service import handle_chat
 from services.magic_service import handle_magic
@@ -10,15 +10,11 @@ router = APIRouter(prefix="/api")
 @router.post("/chat")
 async def chat(request: Request):
     """
-    Endpoint to handle chat requests.
-
-    Receives a JSON payload from the client, passes it to the chat handler,
-    and returns a success status.
-
-    Request body:
-        JSON object containing chat data.
-
-    Response:
+    处理聊天请求的接口。
+    接收客户端发来的 JSON 数据，交给聊天服务处理，并返回成功状态。
+    请求体：
+        包含聊天数据的 JSON 对象。
+    响应：
         {"status": "done"}
     """
     data = await request.json()
@@ -28,16 +24,13 @@ async def chat(request: Request):
 @router.post("/cancel/{session_id}")
 async def cancel_chat(session_id: str):
     """
-    Endpoint to cancel an ongoing stream task for a given session_id.
-
-    If the task exists and is not yet completed, it will be cancelled.
-
-    Path parameter:
-        session_id (str): The ID of the session whose task should be cancelled.
-
-    Response:
-        {"status": "cancelled"} if the task was cancelled.
-        {"status": "not_found_or_done"} if no such task exists or it is already done.
+    取消指定会话正在进行的流式任务。
+    若任务存在且尚未完成，则将其取消。
+    路径参数：
+        session_id (str)：需要取消任务的会话 ID。
+    响应：
+        {"status": "cancelled"}：任务已取消。
+        {"status": "not_found_or_done"}：任务不存在或已完成。
     """
     task = get_stream_task(session_id)
     if task and not task.done():
@@ -48,15 +41,11 @@ async def cancel_chat(session_id: str):
 @router.post("/magic")
 async def magic(request: Request):
     """
-    Endpoint to handle magic generation requests.
-
-    Receives a JSON payload from the client, passes it to the magic handler,
-    and returns a success status.
-
-    Request body:
-        JSON object containing magic generation data.
-
-    Response:
+    处理 Magic 生成请求的接口。
+    接收客户端发来的 JSON 数据，交给 Magic 服务处理，并返回成功状态。
+    请求体：
+        包含 Magic 生成数据的 JSON 对象。
+    响应：
         {"status": "done"}
     """
     data = await request.json()
@@ -66,16 +55,13 @@ async def magic(request: Request):
 @router.post("/magic/cancel/{session_id}")
 async def cancel_magic(session_id: str) -> Dict[str, str]:
     """
-    Endpoint to cancel an ongoing magic generation task for a given session_id.
-
-    If the task exists and is not yet completed, it will be cancelled.
-
-    Path parameter:
-        session_id (str): The ID of the session whose task should be cancelled.
-
-    Response:
-        {"status": "cancelled"} if the task was cancelled.
-        {"status": "not_found_or_done"} if no such task exists or it is already done.
+    取消指定会话正在进行的 Magic 生成任务。
+    若任务存在且尚未完成，则将其取消。
+    路径参数：
+        session_id (str)：需要取消任务的会话 ID。
+    响应：
+        {"status": "cancelled"}：任务已取消。
+        {"status": "not_found_or_done"}：任务不存在或已完成。
     """
     task = get_stream_task(session_id)
     if task and not task.done():

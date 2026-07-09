@@ -4,9 +4,10 @@ Agnes AI 视频生成提供者
 使用 Agnes AI 视频模型生成视频，支持模型自动降级和预校验机制。
 """
 
-import json
 import traceback
 import asyncio
+import time
+import random
 from typing import Optional, Dict, Any, List
 import httpx
 
@@ -15,16 +16,38 @@ from utils.http_client import HttpClient
 from services.config_service import config_service
 from ..agnes_api_routes import (
     AGNES_VIDEO_API_ROUTE,
-    AGNES_VIDEO_POLL_ROUTE,
-    AGNES_AGNESAPI_POLL_ROUTE,
     build_video_api_url,
-    get_api_root,
+    build_video_poll_url,
+    build_video_alt_poll_url,
+    build_agnesapi_poll_url,
 )
 from ..agnes_model_config import (
     AGNES_VIDEO_MODELS,
     AGNES_VIDEO_MODEL_DEFAULT,
     is_valid_video_model,
 )
+
+# Agnes 视频接口限流：约 1 次/分钟
+VIDEO_CREATE_RATE_LIMIT_SECONDS = 62
+# 单个视频轮询基础预算（秒），会按视频时长动态增加
+VIDEO_POLL_BUDGET_BASE_SECONDS = 180
+# 任务仍在 in_progress 时，超过预算后额外等待的宽限时间（秒）
+VIDEO_POLL_GRACE_SECONDS = 120
+
+VIDEO_SIZE_BY_RATIO = {
+    ("9:16", "480p"): "480x854",
+    ("9:16", "1080p"): "1080x1920",
+    ("16:9", "480p"): "854x480",
+    ("16:9", "1080p"): "1920x1080",
+    ("1:1", "480p"): "480x480",
+    ("1:1", "1080p"): "1080x1080",
+    ("4:3", "480p"): "640x480",
+    ("4:3", "1080p"): "1440x1080",
+    ("3:4", "480p"): "480x640",
+    ("3:4", "1080p"): "1080x1440",
+    ("21:9", "480p"): "1120x480",
+    ("21:9", "1080p"): "2520x1080",
+}
 
 
 class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
@@ -75,11 +98,142 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
         }
 
     def _extract_video_url(self, poll_res: Dict[str, Any]) -> Optional[str]:
-        for key in ("url", "video_url", "result_url", "remixed_from_video_id"):
+        if not isinstance(poll_res, dict):
+            return None
+
+        for key in ("url", "video_url", "result_url", "download_url", "output_url"):
             value = poll_res.get(key)
             if isinstance(value, str) and value.startswith("http"):
                 return value
+
+        output = poll_res.get("output")
+        if isinstance(output, dict):
+            nested_url = self._extract_video_url(output)
+            if nested_url:
+                return nested_url
+        elif isinstance(output, str) and output.startswith("http"):
+            return output
+
+        result = poll_res.get("result")
+        if isinstance(result, dict):
+            nested_url = self._extract_video_url(result)
+            if nested_url:
+                return nested_url
+
+        data = poll_res.get("data")
+        if isinstance(data, dict):
+            nested_url = self._extract_video_url(data)
+            if nested_url:
+                return nested_url
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    nested_url = self._extract_video_url(item)
+                    if nested_url:
+                        return nested_url
+
+        content = poll_res.get("content")
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict):
+                    nested_url = self._extract_video_url(item)
+                    if nested_url:
+                        return nested_url
+
         return None
+
+    def _extract_poll_status(self, poll_res: Dict[str, Any]) -> Optional[str]:
+        if not isinstance(poll_res, dict):
+            return None
+
+        for key in ("status", "state", "task_status"):
+            value = poll_res.get(key)
+            if isinstance(value, str):
+                return value.lower()
+
+        for nested_key in ("data", "output", "result"):
+            nested = poll_res.get(nested_key)
+            if isinstance(nested, dict):
+                status = self._extract_poll_status(nested)
+                if status:
+                    return status
+
+        # agnesapi 等接口可能直接返回视频 URL 而无 status 字段
+        if self._extract_video_url(poll_res):
+            return "succeeded"
+
+        return None
+
+    def _build_poll_urls(
+        self,
+        task_id: str,
+        video_id: Optional[str],
+        model_name: Optional[str],
+    ) -> List[str]:
+        urls: List[str] = []
+        seen: set[str] = set()
+
+        def add(url: str) -> None:
+            if url and url not in seen:
+                seen.add(url)
+                urls.append(url)
+
+        # 与 Apifox 一致：GET /agnesapi?video_id=xxx
+        if video_id:
+            add(build_agnesapi_poll_url(self.base_url, video_id))
+        add(build_video_alt_poll_url(self.base_url, task_id))
+        add(build_video_poll_url(self.base_url, task_id))
+        return urls
+
+    def _get_poll_interval(self, attempt: int) -> float:
+        if attempt < 12:
+            return 2.0
+        if attempt < 30:
+            return 3.0
+        if attempt < 45:
+            return 4.0
+        return 5.0
+
+    def _is_transient_network_error(self, error: Exception) -> bool:
+        if isinstance(
+            error,
+            (
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                httpx.ReadError,
+                httpx.WriteError,
+                httpx.NetworkError,
+            ),
+        ):
+            return True
+
+        error_text = f"{type(error).__name__} {error}".lower()
+        return any(
+            keyword in error_text
+            for keyword in ("connection", "timeout", "timed out", "network")
+        )
+
+    def _get_poll_budget_seconds(self, duration: int) -> int:
+        # 15s 视频在 Agnes 上常需 6-9 分钟；视频1本次用了 414s
+        return max(600, VIDEO_POLL_BUDGET_BASE_SECONDS + duration * 30)
+
+    def _max_poll_attempts(self, poll_budget: int) -> int:
+        return max(60, poll_budget // 3)
+
+    def _is_poll_in_progress(self, status: Optional[str]) -> bool:
+        return status in (
+            None,
+            "pending",
+            "processing",
+            "running",
+            "queued",
+            "in_progress",
+            "submitted",
+            "created",
+        )
+
+    def _is_poll_succeeded(self, status: Optional[str]) -> bool:
+        return status in ("succeeded", "completed", "success", "done", "finished")
 
     def _extract_error_info(self, response: httpx.Response) -> dict:
         """
@@ -115,69 +269,113 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
         task_id: str,
         headers: Dict[str, str],
         video_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        duration: int = 10,
     ) -> str:
-        polling_url = f"{self.base_url}{AGNES_VIDEO_POLL_ROUTE.format(task_id=task_id)}"
-        max_attempts = 60
-        initial_interval = 2.0
-        max_interval = 15.0
+        polling_urls = self._build_poll_urls(task_id, video_id, model_name)
+        poll_budget = self._get_poll_budget_seconds(duration)
+        max_attempts = self._max_poll_attempts(poll_budget)
+        poll_started_at = time.monotonic()
 
-        print(f"🎥 [Agnes-Video] 轮询URL: {polling_url}")
+        print(
+            f"🎥 [Agnes-Video] 轮询URL列表: {polling_urls}，"
+            f"轮询预算: {poll_budget}s（时长 {duration}s）"
+        )
 
-        for attempt in range(max_attempts):
-            print(f"🎥 [Agnes-Video] 轮询任务状态 {task_id} (尝试 {attempt+1})...")
+        async with HttpClient.create(
+            timeout=httpx.Timeout(30.0, connect=10.0)
+        ) as client:
+            for attempt in range(max_attempts):
+                last_status: Optional[str] = None
+                urls_to_try = polling_urls
 
-            try:
-                async with HttpClient.create(timeout=httpx.Timeout(30.0)) as client:
-                    response = await client.get(polling_url, headers=headers)
+                try:
+                    for polling_url in urls_to_try:
+                        try:
+                            response = await client.get(polling_url, headers=headers)
+                        except Exception as request_error:
+                            if self._is_transient_network_error(request_error):
+                                print(
+                                    f"🎥 [Agnes-Video] 轮询请求超时，尝试下一个: "
+                                    f"{polling_url} ({request_error})"
+                                )
+                                continue
+                            raise
 
-                    if response.status_code == 429:
-                        interval = min(initial_interval * (2 ** attempt), max_interval)
-                        print(f"🎥 [Agnes-Video] 轮询限流，等待 {interval} 秒...")
-                        await asyncio.sleep(interval)
-                        continue
+                        if response.status_code == 429:
+                            await asyncio.sleep(self._get_poll_interval(attempt))
+                            break
 
-                    if response.status_code == 404:
-                        print(f"🎥 [Agnes-Video] 轮询端点不存在: {polling_url}")
-                        raise Exception("视频状态查询接口地址无效，请核对Agnes服务接口路由配置")
+                        if response.status_code == 404:
+                            continue
 
-                    if response.status_code != 200:
-                        error_text = response.text
-                        raise Exception(f"获取任务状态失败: HTTP {response.status_code} - {error_text}")
+                        if response.status_code != 200:
+                            continue
 
-                    try:
-                        poll_res = response.json()
-                    except Exception:
-                        raise Exception(f"解析任务状态失败: {response.text}")
+                        try:
+                            poll_res = response.json()
+                        except Exception:
+                            continue
 
-                    status = poll_res.get("status", None)
-
-                    if status in ("succeeded", "completed"):
                         video_url = self._extract_video_url(poll_res)
                         if video_url:
-                            await asyncio.sleep(3)
+                            elapsed = time.monotonic() - poll_started_at
+                            print(
+                                f"🎥 [Agnes-Video] 轮询成功 ({elapsed:.0f}s)，"
+                                f"视频URL: {video_url}"
+                            )
                             return video_url
-                        raise Exception("生成成功但未找到视频链接")
-                    elif status == "failed":
-                        error_message = poll_res.get("error", f"任务失败: {status}")
-                        raise Exception(f"视频生成失败: {error_message}")
-                    elif status == "cancelled":
-                        raise Exception("任务已取消")
-                    elif status in ("pending", "processing", "running", "queued", "in_progress"):
-                        interval = min(initial_interval * (1.5 ** attempt), max_interval)
-                        print(f"🎥 [Agnes-Video] 任务 {task_id} 状态 {status}，下次轮询在 {interval:.1f}s 后")
-                        await asyncio.sleep(interval)
-                        continue
-                    else:
-                        raise Exception(f"未知任务状态: {status}")
-            except Exception as e:
-                if "Connection" in str(e) or "timeout" in str(e).lower():
-                    interval = min(initial_interval * (2 ** attempt), max_interval)
-                    print(f"🎥 [Agnes-Video] 轮询连接问题: {e}，{interval:.1f}s 后重试...")
-                    await asyncio.sleep(interval)
-                    continue
-                raise
 
-        raise Exception(f"视频生成超时，请稍后重试")
+                        status = self._extract_poll_status(poll_res)
+                        last_status = status
+
+                        if self._is_poll_succeeded(status):
+                            raise Exception("生成成功但未找到视频链接")
+                        if status == "failed":
+                            error_message = poll_res.get("error", f"任务失败: {status}")
+                            raise Exception(f"视频生成失败: {error_message}")
+                        if status == "cancelled":
+                            raise Exception("任务已取消")
+                        if self._is_poll_in_progress(status):
+                            if attempt % 4 == 0:
+                                print(
+                                    f"🎥 [Agnes-Video] [{polling_url}] "
+                                    f"任务 {task_id} 状态 {status or '处理中'}"
+                                )
+                            continue
+
+                    elapsed = time.monotonic() - poll_started_at
+                    hard_limit = poll_budget + (
+                        VIDEO_POLL_GRACE_SECONDS
+                        if self._is_poll_in_progress(last_status)
+                        else 0
+                    )
+                    if elapsed >= hard_limit:
+                        raise Exception(
+                            f"视频生成超时（已等待 {int(elapsed)} 秒，"
+                            f"预算 {poll_budget} 秒），请稍后重试"
+                        )
+
+                    interval = self._get_poll_interval(attempt)
+                    if attempt % 4 == 0:
+                        print(
+                            f"🎥 [Agnes-Video] 任务 {task_id} 仍在处理"
+                            f"（最近状态: {last_status or '处理中'}），"
+                            f"下次轮询在 {interval:.0f}s 后"
+                        )
+                    await asyncio.sleep(interval)
+                except Exception as e:
+                    if self._is_transient_network_error(e):
+                        await asyncio.sleep(self._get_poll_interval(attempt))
+                        continue
+                    raise
+
+        raise Exception(
+            f"视频生成超时（预算 {poll_budget} 秒），请稍后重试"
+        )
+
+    def _resolve_video_size(self, aspect_ratio: str, resolution: str) -> Optional[str]:
+        return VIDEO_SIZE_BY_RATIO.get((aspect_ratio, resolution))
 
     async def generate(
         self,
@@ -185,7 +383,7 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
         model: str,
         resolution: str = "480p",
         duration: int = 5,
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "9:16",
         input_images: Optional[List[str]] = None,
         camera_fixed: bool = True,
         **kwargs: Any
@@ -225,7 +423,21 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                         "num_frames": num_frames,
                         "aspect_ratio": aspect_ratio,
                         "ratio": aspect_ratio,
+                        "seed": random.randint(1, 2_147_483_647),
                     }
+
+                    negative_prompt = kwargs.get("negative_prompt")
+                    if negative_prompt:
+                        payload["negative_prompt"] = negative_prompt
+
+                    video_size = self._resolve_video_size(aspect_ratio, resolution)
+                    if video_size:
+                        payload["size"] = video_size
+
+                    print(
+                        f"🎥 [Agnes-Video] 视频参数: "
+                        f"aspect_ratio={aspect_ratio}, size={video_size or 'auto'}"
+                    )
 
                     if input_images:
                         payload["input_images"] = input_images
@@ -234,7 +446,7 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                     print(f"🎥 [Agnes-Video] 开始视频生成 - 模型: {current_model} (尝试 {attempt_idx + 1}/{len(models_to_try)})")
 
                     max_retries = 2
-                    retry_wait = 65
+                    retry_wait = VIDEO_CREATE_RATE_LIMIT_SECONDS
 
                     for inner_attempt in range(max_retries + 1):
                         print(f"🎥 [Agnes-Video] 视频生成尝试 {inner_attempt+1}/{max_retries+1}")
@@ -292,6 +504,7 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                                         f"🎥 [Agnes-Video] 视频任务创建成功, "
                                         f"任务ID: {task_id}, 视频ID: {video_id}"
                                     )
+                                    break
 
                                 elif response.status_code == 429:
                                     print(f"🎥 [Agnes-Video] 限流 (尝试 {inner_attempt+1}/{max_retries})")
@@ -336,6 +549,8 @@ class AgnesVideoProvider(VideoProviderBase, provider_name="agnes"):
                             resolved_task_id,
                             headers,
                             video_id=video_id,
+                            model_name=current_model,
+                            duration=duration,
                         )
                         print(f"🎥 [Agnes-Video] 视频生成成功 - 模型: {current_model}, 视频URL: {video_url}")
                         return video_url

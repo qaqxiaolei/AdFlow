@@ -35,13 +35,13 @@ async def handle_chat(data: Dict[str, Any]) -> None:
             - text_model: 文本模型配置信息
             - tool_list: 工具模型配置列表
     """
-    # Extract fields from incoming data
+    # 从传入的数据中提取字段
     messages: List[Dict[str, Any]] = data.get('messages', [])
     session_id: str = data.get('session_id', '')
     canvas_id: str = data.get('canvas_id', '')
     text_model: ModelInfo = data.get('text_model', {})
     tool_list: List[ToolInfoJson] = data.get('tool_list', [])
-    print('👇 chat_service got tool_list', tool_list)
+    print('👇 聊天服务已接收到前端传过来的工具列表', tool_list)
     search_tool = tool_service.tools.get('search_video_by_platform')
     if search_tool:
         search_tool_info = {
@@ -52,30 +52,30 @@ async def handle_chat(data: Dict[str, Any]) -> None:
             'provider': search_tool.get('provider', 'system'),
         }
         tool_list.append(search_tool_info)
-        print('👇 Added search_video_by_platform to tool_list')
-    # TODO: save and fetch system prompt from db or settings config
+        print('👇 聊天服务已添加搜索视频工具到工具列表')
+    # 从数据库或配置文件里读取系统提示词
     system_prompt: Optional[str] = data.get('system_prompt')
-    # If there is only one message, create a new chat session
+    # 如果只有一条消息，创建一个新的聊天会话
     if len(messages) == 1:
-        # create new session
+        # 创建新的聊天会话
         prompt = messages[0].get('content', '')
-        # TODO: Better way to determin when to create new chat session.
+        # 更好的方式来确定何时创建新的聊天会话。
         await db_service.create_chat_session(session_id, text_model.get('model'), text_model.get('provider'), canvas_id, (prompt[:200] if isinstance(prompt, str) else ''))
     await db_service.create_message(session_id, messages[-1].get('role', 'user'), json.dumps(messages[-1])) if len(messages) > 0 else None
-    # Create and start langgraph_agent task for chat processing
+    # 创建并启动 langgraph_agent 任务来处理聊天请求
     task = asyncio.create_task(langgraph_multi_agent(
         messages, canvas_id, session_id, text_model, tool_list, system_prompt))
-    # Register the task in stream_tasks (for possible cancellation)
+    # 将任务注册到 stream_tasks 中（用于可能的取消）
     add_stream_task(session_id, task)
     try:
-        # Await completion of the langgraph_agent task
+        # 等待 langgraph_agent 任务完成
         await task
     except asyncio.exceptions.CancelledError:
-        print(f"🛑Session {session_id} cancelled during stream")
+        print(f"🛑 会话 {session_id} 在流式处理期间被取消")
     finally:
-        # Always remove the task from stream_tasks after completion/cancellation
+        # 在任务完成/取消后，从 stream_tasks 中移除任务
         remove_stream_task(session_id)
-        # Notify frontend WebSocket that chat processing is done
+        # 通过 WebSocket 通知前端聊天处理已完成
         await send_to_websocket(session_id, {
             'type': 'done'
         })

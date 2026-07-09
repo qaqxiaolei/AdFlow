@@ -141,18 +141,46 @@ async def send_video_completion_notification(
     )
 
 
-async def send_video_error_notification(session_id: str, error_message: str) -> None:
+async def send_video_error_notification(
+    session_id: str,
+    error_message: str,
+    *,
+    notify_user: bool = True,
+) -> None:
     """Send WebSocket notification about video generation error"""
     print(f"🎥 Video generation error: {error_message}")
+    if not notify_user:
+        return
     await send_to_websocket(session_id, {
         "type": "error",
-        "error": error_message
+        "error": format_user_video_error(error_message),
     })
+
+
+def format_user_video_error(error_message: str) -> str:
+    """将内部错误信息转换为用户可理解的提示，不暴露秒数等技术细节"""
+    lowered = error_message.lower()
+    if "timeout" in lowered or "超时" in error_message:
+        return "视频生成时间较长，尚未完成，请稍后重试"
+    if (
+        "rate_limit" in lowered
+        or "429" in error_message
+        or "过于频繁" in error_message
+    ):
+        return "视频生成请求过于频繁，请等待约 1 分钟后重试"
+    if "connection" in lowered or "网络" in error_message:
+        return "网络连接中断，请检查网络后重试"
+    if "不可用" in error_message or "unavailable" in lowered:
+        return "视频服务暂时不可用，请稍后重试"
+    return "视频生成失败，请稍后重试"
 
 
 def format_video_success_message(filename: str) -> str:
     """Format success message for video generation"""
-    return f"video generated successfully ![video_id: {filename}](http://localhost:{DEFAULT_PORT}/api/file/{filename})"
+    return (
+        f"video generated successfully "
+        f"![video_id: {filename}](/api/file/{filename})"
+    )
 
 
 async def process_video_result(
