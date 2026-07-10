@@ -1,12 +1,12 @@
 import ErrorBoundary from '@/components/common/ErrorBoundary'
+import SettingsDialog from '@/components/settings/dialog'
 import { createRootRoute, Outlet } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 export const Route = createRootRoute({
   component: () => (
     <>
       <Outlet />
-      <TanStackRouterDevtools />
+      <SettingsDialog />
     </>
   ),
   errorComponent: ErrorBoundary,
