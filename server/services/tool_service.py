@@ -43,9 +43,9 @@ TOOL_MAPPING: Dict[str, ToolInfo] = {
         "tool_function": generate_image_by_agnes,
     },
     "generate_video_by_agnes": {
-        "display_name": "Agnes Video",
+        "display_name": "Seedance 2.0",
         "type": "video",
-        "provider": "agnes",
+        "provider": "volces",
         "tool_function": generate_video_by_agnes,
     },
     "generate_image_by_doubao_seedream_3_volces": {

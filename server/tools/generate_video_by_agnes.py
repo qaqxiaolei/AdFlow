@@ -7,6 +7,7 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langchain_core.runnables import RunnableConfig
 from tools.video_generation.video_generation_core import generate_video_with_provider
 from tools.video_generation.video_prompt_utils import enhance_video_prompt
+from tools.agnes_model_config import VOLCES_VIDEO_MODEL_DEFAULT
 from tools.video_providers.agnes_provider import VIDEO_CREATE_RATE_LIMIT_SECONDS
 from .utils.image_utils import process_input_image
 
@@ -207,7 +208,7 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
 
 
 @tool("generate_video_by_agnes",
-      description="使用 Agnes AI 视频模型生成视频。提示词需包含详细的视觉场景描述（可用中文）。用户消息中的 <aspect_ratio> 和 <quantity> 标签必须原样传入对应参数。",
+      description="使用 Seedance 2.0 视频模型（火山方舟）生成视频。提示词需包含详细的视觉场景描述（可用中文）。用户消息中的 <aspect_ratio> 和 <quantity> 标签必须原样传入对应参数。",
       args_schema=GenerateVideoByAgnesInputSchema)
 async def generate_video_by_agnes(
     prompt: str,
@@ -267,12 +268,12 @@ async def generate_video_by_agnes(
         for i, p in enumerate(prompt_result['prompts'], 1):
             print(
                 f"🎥 [GenerateVideo] 视频 {i} 提示词: "
-                f"{p['prompt'][:100]}..."
+                f"{p['prompt']}"
             )
             if p.get('negative_prompt'):
                 print(
                     f"🎥 [GenerateVideo] 视频 {i} 负面提示词: "
-                    f"{p['negative_prompt'][:100]}..."
+                    f"{p['negative_prompt']}"
                 )
 
         print(
@@ -306,7 +307,8 @@ async def generate_video_by_agnes(
                     resolution=resolution,
                     duration=duration,
                     aspect_ratio=actual_ratio,
-                    model="agnes-video-v2.0",
+                    model=VOLCES_VIDEO_MODEL_DEFAULT,
+                    provider="volces",
                     tool_call_id=f"{tool_call_id}_{i}",
                     config=config,
                     input_images=processed_input_images,
@@ -341,7 +343,8 @@ async def generate_video_by_agnes(
         resolution=resolution,
         duration=duration,
         aspect_ratio=actual_ratio,
-        model="agnes-video-v2.0",
+        model=VOLCES_VIDEO_MODEL_DEFAULT,
+        provider="volces",
         tool_call_id=tool_call_id,
         config=config,
         input_images=processed_input_images,

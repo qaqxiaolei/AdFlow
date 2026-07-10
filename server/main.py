@@ -62,7 +62,7 @@ async def _warmup_agents():
                 {'id': 'write_plan', 'provider': 'system', 'type': 'system'},
                 {'id': 'search_video_by_platform', 'provider': 'system', 'type': 'search'},
                 {'id': 'generate_image_by_agnes', 'provider': 'agnes', 'type': 'image'},
-                {'id': 'generate_video_by_agnes', 'provider': 'agnes', 'type': 'video'},
+                {'id': 'generate_video_by_agnes', 'provider': 'volces', 'type': 'video'},
             ]
             agents = AgentManager.create_agents(model_instance, tool_list)
             agent_cache.set_agents(first_model, tool_list, agents)
@@ -82,7 +82,7 @@ async def _warmup_agents():
                 {'id': 'write_plan', 'provider': 'system', 'type': 'system'},
                 {'id': 'search_video_by_platform', 'provider': 'system', 'type': 'search'},
                 {'id': 'generate_image_by_agnes', 'provider': 'agnes', 'type': 'image'},
-                {'id': 'generate_video_by_agnes', 'provider': 'agnes', 'type': 'video'},
+                {'id': 'generate_video_by_agnes', 'provider': 'volces', 'type': 'video'},
             ]
             agents = AgentManager.create_agents(model_instance, tool_list)
             agent_cache.set_agents(first_model, tool_list, agents)

@@ -69,6 +69,7 @@ async def generate_video_by_seedance_v1_pro_volces(
         duration=duration,
         aspect_ratio=aspect_ratio,
         model="doubao-seedance-1-0-pro-250528",
+        provider="volces",
         tool_call_id=tool_call_id,
         config=config,
         input_images=processed_input_images,

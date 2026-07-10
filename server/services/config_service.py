@@ -31,11 +31,18 @@ DEFAULT_PROVIDERS_CONFIG: AppConfig = {
         'models': {
             'agnes-2.0-flash': {'type': 'text'},
             'agnes-image-2.1-flash': {'type': 'image'},
-            'agnes-video-v2.0': {'type': 'video'},
         },
         'url': 'https://apihub.agnes-ai.com/v1/',
         'api_key': 'sk-ihAH33etQMw6E9mIZCChZnpVzW5WYgQLZWLgsJKuqL5lvedA',
         'max_tokens': 8192,
+    },
+    'volces': {
+        'models': {
+            'doubao-seedance-2-0-260128': {'type': 'video'},
+            'doubao-seedance-2-0-fast-260128': {'type': 'video'},
+        },
+        'url': 'https://ark.cn-beijing.volces.com/api/v3',
+        'api_key': 'ark-2ccdfc6f-7bed-4177-a1ff-5cdd3c3aefdd-39e2b',
     },
     'comfyui': {
         'models': {},
@@ -126,6 +133,17 @@ class ConfigService:
             async with aiofiles.open(self.config_file, "r") as f:
                 content = await f.read()
                 config: AppConfig = toml.loads(content)
+            # 合并默认配置中缺失的 provider（如新增 volces）
+            for provider, default_cfg in DEFAULT_PROVIDERS_CONFIG.items():
+                if provider not in config:
+                    config[provider] = copy.deepcopy(default_cfg)
+                    continue
+                default_provider_cfg = DEFAULT_PROVIDERS_CONFIG[provider]
+                for key, value in default_provider_cfg.items():
+                    if key == 'models':
+                        continue
+                    if not config[provider].get(key):
+                        config[provider][key] = value
             for provider, provider_config in config.items():
                 if provider not in DEFAULT_PROVIDERS_CONFIG:
                     provider_config['is_custom'] = True
