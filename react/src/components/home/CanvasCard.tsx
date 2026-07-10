@@ -1,5 +1,6 @@
 import { deleteCanvas, ListCanvasesResponse } from '@/api/canvas'
-import { ImageIcon, Trash2 } from 'lucide-react'
+import { DEFAULT_CANVAS_COVER_URL } from '@/constants'
+import { Trash2 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -15,6 +16,19 @@ type CanvasCardProps = {
     handleDeleteCanvas: () => void
 }
 
+function DefaultCanvasCover({ name }: { name: string }) {
+    return (
+        <div className="w-full h-40 rounded-lg overflow-hidden bg-gradient-to-br from-violet-100 via-purple-50 to-orange-50 dark:from-violet-950/50 dark:via-purple-950/30 dark:to-orange-950/20 flex items-center justify-center">
+            <img
+                src={DEFAULT_CANVAS_COVER_URL}
+                alt={name}
+                className="w-14 h-14 object-contain opacity-90"
+                draggable={false}
+            />
+        </div>
+    )
+}
+
 const CanvasCard: React.FC<CanvasCardProps> = ({
     index,
     canvas,
@@ -23,6 +37,9 @@ const CanvasCard: React.FC<CanvasCardProps> = ({
 }) => {
     const { t } = useTranslation()
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+    const [thumbnailError, setThumbnailError] = useState(false)
+
+    const showDefaultCover = !canvas.thumbnail || thumbnailError
 
     const handleDelete = async () => {
         try {
@@ -50,7 +67,7 @@ const CanvasCard: React.FC<CanvasCardProps> = ({
                 <Button
                     variant="secondary"
                     size="icon"
-                    className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    className="absolute top-3 right-3 sm:top-4 sm:right-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300 z-10"
                 >
                     <Trash2 className="w-4 h-4" />
                 </Button>
@@ -60,16 +77,15 @@ const CanvasCard: React.FC<CanvasCardProps> = ({
                 className="p-3 flex flex-col gap-2"
                 onClick={() => handleCanvasClick(canvas.id)}
             >
-                {canvas.thumbnail ? (
+                {showDefaultCover ? (
+                    <DefaultCanvasCover name={canvas.name} />
+                ) : (
                     <img
                         src={canvas.thumbnail}
                         alt={canvas.name}
-                        className="w-full h-40 object-cover rounded-lg"
+                        className="w-full h-40 object-cover rounded-lg bg-muted"
+                        onError={() => setThumbnailError(true)}
                     />
-                ) : (
-                    <div className="w-full h-40 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <ImageIcon className="w-10 h-10 opacity-10" />
-                    </div>
                 )}
                 <div className="flex flex-col">
                     <h3 className="text-lg font-bold">{canvas.name}</h3>

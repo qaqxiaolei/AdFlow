@@ -57,6 +57,7 @@ export const TOOL_CALL_NAME_MAPPING: { [key in ToolCallFunctionName]: string } =
 }
 
 export const LOGO_URL = '/BRT-logo.webp'
+export const DEFAULT_CANVAS_COVER_URL = LOGO_URL
 
 export const DEFAULT_SYSTEM_PROMPT = `You are a professional art design agent. You can write very professional image prompts to generate aesthetically pleasing images that best fulfilling and matching the user's request.
 Step 1. write a design strategy plan. Write in the same language as the user's inital first prompt.

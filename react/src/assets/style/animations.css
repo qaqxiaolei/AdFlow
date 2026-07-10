@@ -12,3 +12,16 @@
     transform: rotate(1deg) translateX(2px);
   }
 }
+
+.toolcall-progress-indeterminate {
+  animation: toolcall-progress-slide 1.6s ease-in-out infinite;
+}
+
+@keyframes toolcall-progress-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}

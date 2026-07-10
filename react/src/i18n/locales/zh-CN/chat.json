@@ -48,6 +48,8 @@
   "modelSelector": {
     "title": "模型",
     "auto": "自动",
+    "loading": "正在加载模型…",
+    "loadFailed": "无法连接服务器，请检查网络后重试",
     "tabs": {
       "image": "图像",
       "video": "视频",

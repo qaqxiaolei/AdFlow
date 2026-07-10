@@ -12,25 +12,29 @@ export type ToolInfo = {
   type?: 'image' | 'tool' | 'video'
 }
 
+async function fetchModelList(path: string): Promise<unknown[]> {
+  const res = await fetch(path, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${path}: HTTP ${res.status}`)
+  }
+  const data = await res.json()
+  if (!Array.isArray(data)) {
+    throw new Error(`Invalid response from ${path}`)
+  }
+  return data
+}
+
 export async function listModels(): Promise<{
   llm: ModelInfo[]
   tools: ToolInfo[]
 }> {
-  const modelsResp = await fetch('/api/list_models')
-    .then((res) => res.json())
-    .catch((err) => {
-      console.error(err)
-      return []
-    })
-  const toolsResp = await fetch('/api/list_tools')
-    .then((res) => res.json())
-    .catch((err) => {
-      console.error(err)
-      return []
-    })
+  const [modelsResp, toolsResp] = await Promise.all([
+    fetchModelList('/api/list_models'),
+    fetchModelList('/api/list_tools'),
+  ])
 
   return {
-    llm: modelsResp,
-    tools: toolsResp,
+    llm: modelsResp as ModelInfo[],
+    tools: toolsResp as ToolInfo[],
   }
 }

@@ -30,7 +30,7 @@ const CanvasList: React.FC = () => {
     }
 
     return (
-        <div className="flex flex-col px-10 mt-10 gap-4 select-none max-w-[1200px] mx-auto">
+        <div className="flex flex-col px-4 sm:px-6 lg:px-10 mt-6 sm:mt-10 gap-4 select-none max-w-[1200px] mx-auto w-full">
             {canvases && canvases.length > 0 && (
                 <motion.span
                     className="text-2xl font-bold"
@@ -42,7 +42,7 @@ const CanvasList: React.FC = () => {
                 </motion.span>
             )}
             <AnimatePresence>
-                <div className="grid grid-cols-4 gap-4 w-full pb-10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 w-full pb-6 sm:pb-10">
                     {canvases?.map((canvas, index) => (
                         <CanvasCard
                             key={canvas.id}

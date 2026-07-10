@@ -1,5 +1,6 @@
 {
   "title": "设置",
+  "backToHome": "返回首页",
   "messages": {
     "settingsSaved": "设置保存成功",
     "settingsReset": "设置已重置为默认值",

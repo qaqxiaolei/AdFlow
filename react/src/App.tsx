@@ -1,6 +1,5 @@
 // import InstallComfyUIDialog from '@/components/comfyui/InstallComfyUIDialog'
 import UpdateNotificationDialog from '@/components/common/UpdateNotificationDialog'
-import SettingsDialog from '@/components/settings/dialog'
 import { ThemeProvider } from '@/components/theme/ThemeProvider'
 import { ConfigsProvider } from '@/contexts/configs'
 import { AuthProvider } from '@/contexts/AuthContext'
@@ -101,7 +100,25 @@ function App() {
     <ThemeProvider defaultTheme={theme} storageKey="vite-ui-theme">
       <PersistQueryClientProvider
         client={queryClient}
-        persistOptions={{ persister }}
+        persistOptions={{
+          persister,
+          dehydrateOptions: {
+            shouldDehydrateQuery: (query) => {
+              if (query.queryKey[0] === 'list_models_v3') {
+                const data = query.state.data as
+                  | { llm?: unknown[]; tools?: unknown[] }
+                  | undefined
+                if (
+                  !data ||
+                  ((data.llm?.length ?? 0) === 0 && (data.tools?.length ?? 0) === 0)
+                ) {
+                  return false
+                }
+              }
+              return query.state.status === 'success'
+            },
+          },
+        }}
       >
         <AuthProvider>
           <ConfigsProvider>
@@ -113,9 +130,6 @@ function App() {
 
               {/* Update Notification Dialog */}
               <UpdateNotificationDialog />
-
-              {/* Settings Dialog */}
-              <SettingsDialog />
             </div>
           </ConfigsProvider>
         </AuthProvider>

@@ -40,6 +40,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { MobileBottomSheet } from '@/components/ui/mobile-bottom-sheet'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 type ChatTextareaProps = {
   pending: boolean
@@ -56,6 +58,23 @@ type ChatTextareaProps = {
   onCancelChat?: () => void
 }
 
+const toolbarIconButtonClass =
+  'touch-manipulation h-8 w-8 shrink-0 p-0'
+
+const toolbarChipButtonClass =
+  'touch-manipulation h-8 shrink-0 px-2 gap-0.5 whitespace-nowrap'
+
+const ASPECT_RATIOS = ['auto', '1:1', '4:3', '3:4', '16:9', '9:16'] as const
+
+function isInteractiveTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false
+  return Boolean(
+    target.closest(
+      'button, a, input, textarea, label, [role="menuitem"], [role="combobox"], [data-radix-popper-content-wrapper]'
+    )
+  )
+}
+
 const ChatTextarea: React.FC<ChatTextareaProps> = ({
   pending,
   className,
@@ -65,10 +84,12 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   onCancelChat,
 }) => {
   const { t } = useTranslation()
+  const isMobile = useIsMobile()
   const { authStatus } = useAuth()
   const { textModel, selectedTools } = useConfigs()
   const { balance } = useBalance()
   const [prompt, setPrompt] = useState('')
+  const [isComposing, setIsComposing] = useState(false)
   const textareaRef = useRef<TextAreaRef>(null)
   const [images, setImages] = useState<
     {
@@ -81,6 +102,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>('9:16')
   const [quantity, setQuantity] = useState<number>(2)
   const [showQuantitySlider, setShowQuantitySlider] = useState(false)
+  const [showAspectRatioPicker, setShowAspectRatioPicker] = useState(false)
   const quantitySliderRef = useRef<HTMLDivElement>(null)
   const MAX_QUANTITY = 30
 
@@ -150,6 +172,8 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }
     onCancelChat?.()
   }, [sessionId, onCancelChat])
+
+  const canSend = prompt.trim().length > 0 && !pending && !isComposing
 
   // Send Prompt
   const handleSendPrompt = useCallback(async () => {
@@ -328,8 +352,10 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }
   }, [uploadImageMutation])
 
-  // Close quantity slider when clicking outside
+  // Close quantity popover when clicking outside (desktop only)
   useEffect(() => {
+    if (isMobile || !showQuantitySlider) return
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         quantitySliderRef.current &&
@@ -339,20 +365,81 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       }
     }
 
-    if (showQuantitySlider) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
+    document.addEventListener('mousedown', handleClickOutside)
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showQuantitySlider])
+  }, [showQuantitySlider, isMobile])
+
+  const quantitySliderClass =
+    'flex-1 h-3 sm:h-2 bg-muted rounded-lg appearance-none cursor-pointer touch-manipulation ' +
+    '[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7 sm:[&::-webkit-slider-thumb]:w-4 sm:[&::-webkit-slider-thumb]:h-4 ' +
+    '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-sm ' +
+    '[&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:h-7 sm:[&::-moz-range-thumb]:w-4 sm:[&::-moz-range-thumb]:h-4 ' +
+    '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0'
+
+  const renderQuantityPanelDesktop = () => (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">
+          {t('chat:textarea.quantity', '生成数量')}
+        </span>
+        <span className="text-sm text-muted-foreground tabular-nums">{quantity}</span>
+      </div>
+      <div className="flex gap-2">
+        {[1, 2].map((value) => (
+          <Button
+            key={value}
+            type="button"
+            variant={quantity === value ? 'default' : 'outline'}
+            className="h-8 flex-1"
+            onClick={() => setQuantity(value)}
+          >
+            {value}
+          </Button>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground shrink-0">1</span>
+        <input
+          type="range"
+          min="1"
+          max={MAX_QUANTITY}
+          value={quantity}
+          onChange={(e) => setQuantity(Number(e.target.value))}
+          className={quantitySliderClass}
+        />
+        <span className="text-xs text-muted-foreground shrink-0">
+          {MAX_QUANTITY}
+        </span>
+      </div>
+    </div>
+  )
+
+  const renderQuantityPanelMobile = () => (
+    <div className="grid grid-cols-2 gap-2.5 pb-1">
+      {[1, 2].map((value) => (
+        <Button
+          key={value}
+          type="button"
+          variant={quantity === value ? 'default' : 'outline'}
+          className="h-11 text-sm touch-manipulation"
+          onClick={() => {
+            setQuantity(value)
+            setShowQuantitySlider(false)
+          }}
+        >
+          {value} {t('chat:textarea.quantityUnit', '个')}
+        </Button>
+      ))}
+    </div>
+  )
 
   return (
     <motion.div
       ref={dropAreaRef}
       className={cn(
-        'w-full flex flex-col items-center border border-primary/20 rounded-2xl p-3 hover:border-primary/40 transition-all duration-300 cursor-text gap-5 bg-background/80 backdrop-blur-xl relative',
+        'w-full flex flex-col items-center border border-primary/20 rounded-2xl p-2.5 sm:p-3 hover:border-primary/40 transition-all duration-300 cursor-text gap-3 sm:gap-5 bg-background/80 backdrop-blur-xl relative',
         isFocused && 'border-primary/40',
         className
       )}
@@ -364,7 +451,10 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: 'linear' }}
-      onClick={() => textareaRef.current?.focus()}
+      onClick={(e) => {
+        if (isInteractiveTarget(e.target)) return
+        textareaRef.current?.focus()
+      }}
     >
       <AnimatePresence>
         {isDragOver && (
@@ -434,6 +524,11 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         value={prompt}
         autoSize
         onChange={(e) => setPrompt(e.target.value)}
+        onCompositionStart={() => setIsComposing(true)}
+        onCompositionEnd={(e) => {
+          setIsComposing(false)
+          setPrompt(e.currentTarget.value)
+        }}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         onKeyDown={(e) => {
@@ -444,8 +539,12 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         }}
       />
 
-      <div className="flex items-center justify-between gap-2 w-full">
-        <div className="flex items-center gap-2 max-w-[calc(100%-50px)] flex-wrap">
+      <div
+        className="flex items-center justify-between gap-1.5 w-full min-w-0 touch-manipulation"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
           <input
             ref={imageInputRef}
             type="file"
@@ -457,6 +556,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
           <Button
             variant="outline"
             size="sm"
+            className={toolbarIconButtonClass}
             onClick={() => imageInputRef.current?.click()}
           >
             <PlusIcon className="size-4" />
@@ -465,99 +565,82 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
           <ModelSelectorV3 />
 
           {/* Aspect Ratio Selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="flex items-center gap-1"
-                size={'sm'}
-              >
-                <RectangleVertical className="size-4" />
-                <span className="text-sm">{selectedAspectRatio}</span>
-                <ChevronDown className="size-3 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-32">
-              {['auto', '1:1', '4:3', '3:4', '16:9', '9:16'].map((ratio) => (
-                <DropdownMenuItem
-                  key={ratio}
-                  onClick={() => setSelectedAspectRatio(ratio)}
-                  className="flex items-center justify-between"
-                >
-                  <span>{ratio}</span>
-                  {selectedAspectRatio === ratio && (
-                    <div className="size-2 rounded-full bg-primary" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Quantity Selector */}
-          <div className="relative" ref={quantitySliderRef}>
+          {isMobile ? (
             <Button
               variant="outline"
-              className="flex items-center gap-1"
-              onClick={() => setShowQuantitySlider(!showQuantitySlider)}
-              size={'sm'}
+              className={cn('inline-flex items-center', toolbarChipButtonClass)}
+              size="sm"
+              onClick={() => setShowAspectRatioPicker(true)}
             >
-              <Hash className="size-4" />
-              <span className="text-sm">{quantity}</span>
-              <ChevronDown className="size-3 opacity-50" />
+              <RectangleVertical className="size-3.5 shrink-0" />
+              <span className="text-xs leading-none">{selectedAspectRatio}</span>
+              <ChevronDown className="size-3 shrink-0 opacity-50" />
+            </Button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn('inline-flex items-center gap-1', toolbarChipButtonClass)}
+                  size="sm"
+                >
+                  <RectangleVertical className="size-4 shrink-0" />
+                  <span className="text-sm">{selectedAspectRatio}</span>
+                  <ChevronDown className="size-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-32">
+                {ASPECT_RATIOS.map((ratio) => (
+                  <DropdownMenuItem
+                    key={ratio}
+                    onSelect={() => setSelectedAspectRatio(ratio)}
+                    className="flex items-center justify-between"
+                  >
+                    <span>{ratio}</span>
+                    {selectedAspectRatio === ratio && (
+                      <div className="size-2 rounded-full bg-primary" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Quantity Selector */}
+          <div className="relative shrink-0" ref={quantitySliderRef}>
+            <Button
+              variant="outline"
+              className={cn('inline-flex items-center', toolbarChipButtonClass)}
+              onClick={() => setShowQuantitySlider(true)}
+              size="sm"
+            >
+              <Hash className="size-3.5 shrink-0" />
+              <span className="text-xs leading-none">{quantity}</span>
+              <ChevronDown className="size-3 shrink-0 opacity-50" />
             </Button>
 
-            {/* Quantity Slider */}
-            <AnimatePresence>
-              {showQuantitySlider && (
-                <motion.div
-                  className="absolute bottom-full mb-2 left-0  bg-background border border-border rounded-lg p-4 shadow-lg min-w-48"
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                >
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {t('chat:textarea.quantity', 'Image Quantity')}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {quantity}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground">1</span>
-                      <input
-                        type="range"
-                        min="1"
-                        max={MAX_QUANTITY}
-                        value={quantity}
-                        onChange={(e) => setQuantity(Number(e.target.value))}
-                        className="flex-1 h-2 bg-muted rounded-lg appearance-none cursor-pointer
-                                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-                                  [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary
-                                  [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm
-                                  [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full
-                                  [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        {MAX_QUANTITY}
-                      </span>
-                    </div>
-                  </div>
-                  {/* Arrow pointing down */}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-border"></div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-background translate-y-[-1px]"></div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {!isMobile && (
+              <AnimatePresence>
+                {showQuantitySlider && (
+                  <motion.div
+                    className="absolute bottom-full mb-2 left-0 z-50 bg-background border border-border rounded-lg p-4 shadow-lg min-w-52"
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                  >
+                    {renderQuantityPanelDesktop()}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
           </div>
         </div>
 
         {
           pending ? (
             <Button
-              className="shrink-0 relative"
+              className="shrink-0 relative touch-manipulation h-8 w-8 sm:h-9 sm:w-9"
               variant="default"
               size="icon"
               onClick={handleCancelChat}
@@ -567,17 +650,51 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
             </Button>
           ) : (
             <Button
-              className="shrink-0"
+              className="shrink-0 touch-manipulation h-8 w-8 sm:h-9 sm:w-9"
               variant="default"
               size="icon"
               onClick={handleSendPrompt}
-              disabled={!textModel || !selectedTools || prompt.length === 0}
+              disabled={!canSend}
             >
               <ArrowUp className="size-4" />
             </Button>
           )
         }
-      </div >
+      </div>
+
+      {isMobile && (
+        <>
+          <MobileBottomSheet
+            open={showAspectRatioPicker}
+            onOpenChange={setShowAspectRatioPicker}
+            title={t('chat:textarea.aspectRatio', '生成比例')}
+          >
+            <div className="grid grid-cols-3 gap-2.5 pb-1">
+              {ASPECT_RATIOS.map((ratio) => (
+                <Button
+                  key={ratio}
+                  type="button"
+                  variant={selectedAspectRatio === ratio ? 'default' : 'outline'}
+                  className="h-11 text-sm touch-manipulation"
+                  onClick={() => {
+                    setSelectedAspectRatio(ratio)
+                    setShowAspectRatioPicker(false)
+                  }}
+                >
+                  {ratio}
+                </Button>
+              ))}
+            </div>
+          </MobileBottomSheet>
+          <MobileBottomSheet
+            open={showQuantitySlider}
+            onOpenChange={setShowQuantitySlider}
+            title={t('chat:textarea.quantity', '生成数量')}
+          >
+            {renderQuantityPanelMobile()}
+          </MobileBottomSheet>
+        </>
+      )}
     </motion.div >
   )
 }

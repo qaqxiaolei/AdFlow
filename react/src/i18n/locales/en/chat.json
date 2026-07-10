@@ -41,6 +41,8 @@
   "modelSelector": {
     "title": "Model",
     "auto": "Auto",
+    "loading": "Loading models…",
+    "loadFailed": "Could not reach the server. Check your network and try again.",
     "tabs": {
       "image": "Image",
       "video": "Video",

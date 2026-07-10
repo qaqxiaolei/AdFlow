@@ -6,6 +6,8 @@ import { createContext, useContext, useEffect, useRef } from 'react'
 export const ConfigsContext = createContext<{
   configsStore: typeof useConfigsStore
   refreshModels: () => void
+  modelsLoading: boolean
+  modelsError: boolean
 } | null>(null)
 
 export const ConfigsProvider = ({
@@ -24,14 +26,24 @@ export const ConfigsProvider = ({
   // 存储上一次的 allTools 值，用于检测新添加的工具，并自动选中
   const previousAllToolsRef = useRef<ModelInfo[]>([])
 
-  const { data: modelList, refetch: refreshModels } = useQuery({
-    queryKey: ['list_models_2'],
+  const { data: modelList, refetch: refreshModels, isFetching, isError } = useQuery({
+    queryKey: ['list_models_v3'],
     queryFn: () => listModels(),
-    staleTime: 5 * 60 * 1000, // 5 分钟内不重复请求
-    placeholderData: (previousData) => previousData,
-    refetchOnWindowFocus: false, // 切换窗口时不反复拉取
+    staleTime: 5 * 60 * 1000,
+    placeholderData: (previousData) => {
+      if (
+        previousData &&
+        ((previousData.llm?.length ?? 0) > 0 || (previousData.tools?.length ?? 0) > 0)
+      ) {
+        return previousData
+      }
+      return undefined
+    },
+    refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    refetchOnMount: false,
+    refetchOnMount: 'always',
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   })
 
   useEffect(() => {
@@ -82,7 +94,7 @@ export const ConfigsProvider = ({
 
   return (
     <ConfigsContext.Provider
-      value={{ configsStore: useConfigsStore, refreshModels }}
+      value={{ configsStore: useConfigsStore, refreshModels, modelsLoading: isFetching, modelsError: isError }}
     >
       {children}
     </ConfigsContext.Provider>
@@ -103,4 +115,15 @@ export const useRefreshModels = () => {
     throw new Error('useRefreshModels must be used within a ConfigsProvider')
   }
   return context.refreshModels
+}
+
+export const useModelsStatus = () => {
+  const context = useContext(ConfigsContext)
+  if (!context) {
+    throw new Error('useModelsStatus must be used within a ConfigsProvider')
+  }
+  return {
+    modelsLoading: context.modelsLoading,
+    modelsError: context.modelsError,
+  }
 }

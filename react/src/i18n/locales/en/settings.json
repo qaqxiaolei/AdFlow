@@ -1,5 +1,6 @@
 {
   "title": "Settings",
+  "backToHome": "Back to Home",
   "messages": {
     "settingsSaved": "Settings saved successfully",
     "settingsReset": "Settings reset to default",

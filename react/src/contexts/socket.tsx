@@ -20,6 +20,15 @@ interface SocketProviderProps {
   children: React.ReactNode
 }
 
+function getSocketServerUrl() {
+  const hostname = window.location.hostname
+  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1'
+  if (import.meta.env.DEV && isLocalHost) {
+    return 'http://localhost:57988'
+  }
+  return window.location.origin
+}
+
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const { t } = useTranslation()
   const [connected, setConnected] = useState(false)
@@ -41,9 +50,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         // Create socket manager instance if not exists
         if (!socketManagerRef.current) {
           socketManagerRef.current = new SocketIOManager({
-            serverUrl: process.env.NODE_ENV === 'development'
-              ? 'http://localhost:57988'
-              : window.location.origin,
+            serverUrl: getSocketServerUrl(),
             autoConnect: false
           })
         }

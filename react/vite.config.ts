@@ -84,17 +84,26 @@ export default defineConfig(({ mode }) => {
   // Configure server based on environment
   if (mode === 'development') {
     config.server = config.server || {}
+    const proxyErrorHandler = (
+      proxy: { on: (event: string, handler: (...args: unknown[]) => void) => void },
+      label: string
+    ) => {
+      proxy.on('error', (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn(`[vite ${label} proxy]`, message)
+      })
+    }
+
     config.server.proxy = {
       '/api': {
         target: `http://127.0.0.1:${PORT}`,
         changeOrigin: true,
-        // Uncomment the following if you want to remove the /api prefix when forwarding to Flask
-        // rewrite: (path) => path.replace(/^\/api/, '')
+        configure: (proxy) => proxyErrorHandler(proxy, 'http'),
       },
-      // Also proxy WebSocket connections
       '/ws': {
         target: `ws://127.0.0.1:${PORT}`,
         ws: true,
+        configure: (proxy) => proxyErrorHandler(proxy, 'ws'),
       },
     }
   }

@@ -1,20 +1,27 @@
 import CommonDialogContent from '@/components/common/DialogContent'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogFooter } from '@/components/ui/dialog'
+import { Dialog } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { useConfigs } from '@/contexts/configs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from '@tanstack/react-router'
 import SettingProviders from './providers'
 import SettingProxy from './proxy'
 import SettingSidebar, { SettingSidebarType } from './sidebar'
-import { X } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 
 const SettingsDialog = () => {
   const { showSettingsDialog: open, setShowSettingsDialog } = useConfigs()
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [current, setCurrent] = useState<SettingSidebarType>('provider')
+
+  const handleBackHome = () => {
+    setShowSettingsDialog(false)
+    navigate({ to: '/' })
+  }
 
   const renderContent = () => {
     switch (current) {
@@ -31,15 +38,29 @@ const SettingsDialog = () => {
       <CommonDialogContent
         open={open}
         transformPerspective={6000}
-        className="flex flex-col p-0 gap-0 w-screen! h-screen! max-h-[100vh]! max-w-[100vw]! rounded-none! border-none! shadow-none!"
+        className="flex flex-col p-0 gap-0 w-screen! h-dvh! max-h-dvh! max-w-[100vw]! rounded-none! border-none! shadow-none!"
       >
-        <SidebarProvider className="h-[calc(100vh-60px)]! min-h-[calc(100vh-60px)]! flex-1 relative">
+        <SidebarProvider className="flex flex-col flex-1 min-h-0 h-full">
+          <header className="flex md:hidden items-center justify-between gap-2 px-2 py-2 border-b border-border shrink-0 bg-background pt-[max(0.5rem,env(safe-area-inset-top))]">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 gap-1 px-2"
+              onClick={handleBackHome}
+            >
+              <ChevronLeft className="size-5" />
+              <span>{t('settings:backToHome')}</span>
+            </Button>
+            <span className="font-semibold text-sm truncate">{t('settings:title')}</span>
+            <SidebarTrigger className="shrink-0" />
+          </header>
+
           <SettingSidebar
             current={current}
             setCurrent={setCurrent}
             onClose={() => setShowSettingsDialog(false)}
           />
-          <ScrollArea className="max-h-[calc(100vh-50px)]! w-full">
+          <ScrollArea className="flex-1 min-h-0 w-full">
             {renderContent()}
           </ScrollArea>
         </SidebarProvider>

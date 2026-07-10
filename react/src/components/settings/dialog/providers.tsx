@@ -77,7 +77,7 @@ const SettingProviders = () => {
     }
 
     return (
-        <div className="flex flex-col items-center justify-center p-4 w-full sm:pb-0 pb-10 relative">
+        <div className="flex flex-col items-center justify-center p-4 w-full pb-24 sm:pb-10 relative">
             {isLoading && (
                 <div className="flex justify-center items-center h-32">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-zinc-500"></div>
@@ -107,7 +107,7 @@ const SettingProviders = () => {
                     </div>
                 ))}
 
-            <div className="flex fixed bottom-0 left-[calc(var(--sidebar-width))] gap-1 right-0 px-1">
+            <div className="flex fixed bottom-0 left-0 md:left-[calc(var(--sidebar-width))] gap-1 right-0 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-background/95 backdrop-blur-sm border-t border-border md:border-t-0 md:bg-transparent md:backdrop-blur-none">
                 <Button onClick={handleSave} className="w-1/2" size="lg">
                     <Save className="mr-2 h-6 w-6" /> {t('settings:saveSettings')}
                 </Button>
