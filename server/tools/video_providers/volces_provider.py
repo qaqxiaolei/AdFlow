@@ -182,12 +182,12 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
                     attempt >= VOLCES_NETWORK_MAX_RETRIES - 1
                     or not HttpClient._is_retryable_network_error(error)
                 ):
+                    if attempt > 0:
+                        print(
+                            f"❌ [Volces] 网络请求失败（已重试 {VOLCES_NETWORK_MAX_RETRIES} 次）: {error}"
+                        )
                     raise
                 wait_seconds = min(3 * (2 ** attempt), 15)
-                print(
-                    f"⚠️ [Volces] 网络异常 (尝试 {attempt + 1}/{VOLCES_NETWORK_MAX_RETRIES}): "
-                    f"{error}，{wait_seconds}s 后重试..."
-                )
                 await asyncio.sleep(wait_seconds)
         if last_error:
             raise last_error
@@ -288,7 +288,7 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
             tool_call_id = str(kwargs.get("tool_call_id", ""))
             timeout = httpx.Timeout(600.0, connect=120.0)
 
-            async with HttpClient.create(timeout=timeout) as client:
+            async with HttpClient.create_long_poll(timeout=timeout) as client:
                 create_response = await self._request_with_retry(
                     client, "POST", api_url, headers, json=payload
                 )

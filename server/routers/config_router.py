@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Request
 from services.config_service import config_service
+from services.model_list_cache import invalidate_list_caches
+from services.model_list_cache import invalidate_list_caches
 # from tools.video_models_dynamic import register_video_models  # Disabled video models
 from services.tool_service import tool_service
 
@@ -20,6 +22,7 @@ async def get_config():
 async def update_config(request: Request):
     data = await request.json()
     res = await config_service.update_config(data)
+    invalidate_list_caches()
 
     # 每次更新配置后，重新初始化工具
     await tool_service.initialize()

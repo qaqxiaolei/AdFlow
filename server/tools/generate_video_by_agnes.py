@@ -7,6 +7,7 @@ from langchain_core.tools import tool, InjectedToolCallId
 from langchain_core.runnables import RunnableConfig
 from tools.video_generation.video_generation_core import generate_video_with_provider
 from tools.video_generation.video_prompt_utils import enhance_video_prompt
+from tools.video_generation.video_canvas_utils import send_tool_call_progress
 from tools.agnes_model_config import VOLCES_VIDEO_MODEL_DEFAULT
 from tools.video_providers.agnes_provider import VIDEO_CREATE_RATE_LIMIT_SECONDS
 from .utils.image_utils import process_input_image
@@ -296,6 +297,18 @@ async def generate_video_by_agnes(
                         f"🎥 [GenerateVideo] 等待限流窗口 "
                         f"{wait_seconds:.0f}s 后生成第 {i}/{resolved_quantity} 个视频"
                     )
+                    session_id = str(
+                        config.get("configurable", {}).get("session_id", "")
+                    )
+                    if session_id:
+                        await send_tool_call_progress(
+                            session_id,
+                            f"{tool_call_id}_{i}",
+                            (
+                                f"第 {i}/{resolved_quantity} 个视频等待提交"
+                                f"（剩余 {int(wait_seconds)} 秒）..."
+                            ),
+                        )
                     await asyncio.sleep(wait_seconds)
 
             print(f"🎥 [GenerateVideo] 开始生成视频 {i}/{resolved_quantity}（{style_label}）")

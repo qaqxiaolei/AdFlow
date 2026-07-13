@@ -1,12 +1,14 @@
 import sqlite3
 import json
 import os
+import re
 from typing import List, Dict, Any, Optional
 import aiosqlite
 from .config_service import USER_DATA_DIR
 from .migrations.manager import MigrationManager, CURRENT_VERSION
 
 DB_PATH = os.path.join(USER_DATA_DIR, "localmanus.db")
+MAX_CANVAS_COUNT = 3
 
 class DatabaseService:
     def __init__(self):
@@ -54,7 +56,8 @@ class DatabaseService:
             await db.commit()
 
     async def list_canvases(self) -> List[Dict[str, Any]]:
-        """获取所有画布"""
+        """获取最近的项目（最多保留 MAX_CANVAS_COUNT 个）"""
+        await self.prune_canvases(MAX_CANVAS_COUNT)
         async with aiosqlite.connect(self.db_path, timeout=30) as db:
             await db.execute("PRAGMA journal_mode=WAL")
             await db.execute("PRAGMA busy_timeout=30000")
@@ -63,9 +66,134 @@ class DatabaseService:
                 SELECT id, name, description, thumbnail, created_at, updated_at, session_id
                 FROM canvases
                 ORDER BY updated_at DESC
-            """)
+                LIMIT ?
+            """, (MAX_CANVAS_COUNT,))
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+    async def get_canvas_thumbnail(self, canvas_id: str) -> Optional[str]:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
+            cursor = await db.execute(
+                "SELECT thumbnail FROM canvases WHERE id = ?",
+                (canvas_id,),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            return row[0] or None
+
+    async def update_canvas_thumbnail(self, canvas_id: str, thumbnail: str):
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
+            await db.execute("""
+                UPDATE canvases
+                SET thumbnail = ?, updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE id = ?
+            """, (thumbnail, canvas_id))
+            await db.commit()
+
+    async def get_canvas_first_user_prompt(self, canvas_id: str) -> Optional[str]:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
+            db.row_factory = sqlite3.Row
+            cursor = await db.execute(
+                "SELECT session_id FROM canvases WHERE id = ?",
+                (canvas_id,),
+            )
+            canvas_row = await cursor.fetchone()
+            if not canvas_row:
+                return None
+
+            session_id = canvas_row["session_id"]
+            if not session_id:
+                cursor = await db.execute("""
+                    SELECT id FROM chat_sessions
+                    WHERE canvas_id = ?
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                """, (canvas_id,))
+                session_row = await cursor.fetchone()
+                if not session_row:
+                    return None
+                session_id = session_row["id"]
+
+            cursor = await db.execute("""
+                SELECT message FROM chat_messages
+                WHERE session_id = ? AND role = 'user'
+                ORDER BY id ASC
+                LIMIT 1
+            """, (session_id,))
+            message_row = await cursor.fetchone()
+            if not message_row or not message_row["message"]:
+                return None
+
+            try:
+                message = json.loads(message_row["message"])
+            except json.JSONDecodeError:
+                return None
+
+            content = message.get("content", "")
+            if isinstance(content, str):
+                text = content
+            elif isinstance(content, list):
+                parts = []
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        parts.append(str(item.get("text", "")))
+                text = " ".join(parts)
+            else:
+                text = ""
+
+            text = re.sub(
+                r"<aspect_ratio>.*?</aspect_ratio>\s*",
+                "",
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            text = re.sub(
+                r"<quantity>.*?</quantity>\s*",
+                "",
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            text = text.strip()
+            return text or None
+
+    async def prune_canvases(self, keep: int = MAX_CANVAS_COUNT):
+        """只保留最近的项目，删除更早的项目及其关联会话"""
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
+            cursor = await db.execute("""
+                SELECT id FROM canvases
+                ORDER BY updated_at DESC, created_at DESC
+            """)
+            rows = await cursor.fetchall()
+            if len(rows) <= keep:
+                return
+
+            ids_to_delete = [row[0] for row in rows[keep:]]
+            for canvas_id in ids_to_delete:
+                await self._delete_canvas_related_data(db, canvas_id)
+            await db.commit()
+
+    async def _delete_canvas_related_data(self, db: aiosqlite.Connection, canvas_id: str):
+        cursor = await db.execute(
+            "SELECT id FROM chat_sessions WHERE canvas_id = ?",
+            (canvas_id,),
+        )
+        session_rows = await cursor.fetchall()
+        for session_row in session_rows:
+            await db.execute(
+                "DELETE FROM chat_messages WHERE session_id = ?",
+                (session_row[0],),
+            )
+        await db.execute("DELETE FROM chat_sessions WHERE canvas_id = ?", (canvas_id,))
+        await db.execute("DELETE FROM canvases WHERE id = ?", (canvas_id,))
 
     async def create_chat_session(self, id: str, model: str, provider: str, canvas_id: str, title: Optional[str] = None):
         """创建一个新的聊天会话"""
@@ -189,11 +317,11 @@ class DatabaseService:
             return None
 
     async def delete_canvas(self, id: str):
-        """删除画布"""
+        """删除画布及其关联会话"""
         async with aiosqlite.connect(self.db_path, timeout=30) as db:
             await db.execute("PRAGMA journal_mode=WAL")
             await db.execute("PRAGMA busy_timeout=30000")
-            await db.execute("DELETE FROM canvases WHERE id = ?", (id,))
+            await self._delete_canvas_related_data(db, id)
             await db.commit()
 
     async def rename_canvas(self, id: str, name: str):

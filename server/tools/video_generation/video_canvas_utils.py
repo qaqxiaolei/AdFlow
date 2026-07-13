@@ -12,6 +12,7 @@ from typing import Dict, List, Any, Tuple, Optional, Union
 from services.config_service import FILES_DIR
 from services.db_service import db_service
 from services.websocket_service import send_to_websocket, broadcast_session_update  # type: ignore
+from services.stream_service import update_session_progress
 from common import DEFAULT_PORT
 from utils.http_client import HttpClient
 import aiofiles
@@ -121,6 +122,9 @@ async def send_tool_call_progress(
     """Push tool progress text to chat UI (ToolcallProgressUpdate)."""
     if not session_id or not tool_call_id:
         return
+    update_session_progress(
+        session_id, last_progress=update, pending_type="tool"
+    )
     await send_to_websocket(session_id, {
         "type": "tool_call_progress",
         "session_id": session_id,
@@ -131,8 +135,12 @@ async def send_tool_call_progress(
 
 async def send_video_start_notification(session_id: str, message: str) -> None:
     """Send WebSocket notification about video generation start"""
+    update_session_progress(
+        session_id, last_progress=message, pending_type="tool"
+    )
     await send_to_websocket(session_id, {
         "type": "video_generation_started",
+        "session_id": session_id,
         "message": message
     })
 

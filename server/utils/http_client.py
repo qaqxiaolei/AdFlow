@@ -115,6 +115,17 @@ class HttpClient:
         return config
 
     @classmethod
+    def _get_long_poll_client_config(cls, **kwargs: Any) -> Dict[str, Any]:
+        """长轮询场景：复用 TCP 连接，降低频繁建连导致的偶发失败。"""
+        config = cls._get_client_config(**kwargs)
+        config['limits'] = httpx.Limits(
+            max_keepalive_connections=4,
+            max_connections=10,
+            keepalive_expiry=120,
+        )
+        return config
+
+    @classmethod
     def _is_retryable_network_error(cls, error: Exception) -> bool:
         message = str(error).lower()
         retryable_markers = (
@@ -176,6 +187,19 @@ class HttpClient:
     ) -> AsyncGenerator[httpx.AsyncClient, None]:
         """创建异步客户端上下文管理器"""
         config = cls._get_client_config(**kwargs)
+        client = httpx.AsyncClient(**config)
+        try:
+            yield client
+        finally:
+            await client.aclose()
+
+    @classmethod
+    @asynccontextmanager
+    async def create_long_poll(
+        cls, **kwargs: Any
+    ) -> AsyncGenerator[httpx.AsyncClient, None]:
+        """创建适用于长轮询的异步客户端（复用连接）。"""
+        config = cls._get_long_poll_client_config(**kwargs)
         client = httpx.AsyncClient(**config)
         try:
             yield client

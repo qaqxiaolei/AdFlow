@@ -1,8 +1,12 @@
-FOOD_POSITIVE_CONSTRAINTS = [
+GENERIC_FOOD_POSITIVE_CONSTRAINTS = [
+    "新鲜食材的自然色泽变化",
+    "食材比例真实的餐饮摆盘",
+]
+
+HOTPOT_FOOD_POSITIVE_CONSTRAINTS = [
     "薄切肥牛卷上可见清晰肉纹和油花",
     "红油汤底表面漂浮辣椒油和气泡",
     "新鲜切好配菜的自然色泽变化",
-    "食材比例真实的餐饮摆盘",
     "正宗中式火锅用餐场景",
     "火锅上方自然升腾的热气",
 ]
@@ -75,6 +79,18 @@ HOTPOT_SCENE_CONSTRAINTS = [
     "食客用筷子夹薄肉片涮入翻滚汤底",
     "热闹拥挤的用餐大厅，暖色吊灯，人流自然穿梭",
     "抖音风格短视频火锅店叙事",
+]
+
+NON_HOTPOT_NEGATIVE_CONSTRAINTS = [
+    "火锅",
+    "锅底",
+    "鸳鸯锅",
+    "红油汤底",
+    "涮肉",
+    "九宫格",
+    "麻辣锅",
+    "hotpot",
+    "hot pot",
 ]
 
 HOTPOT_NEGATIVE_CONSTRAINTS = [
@@ -176,7 +192,10 @@ def build_scene_prompt(
     if style_tags:
         layers.extend(style_tags)
 
-    layers.extend(FOOD_POSITIVE_CONSTRAINTS)
+    if include_hotpot_constraints:
+        layers.extend(HOTPOT_FOOD_POSITIVE_CONSTRAINTS)
+    else:
+        layers.extend(GENERIC_FOOD_POSITIVE_CONSTRAINTS)
 
     prompt = "，".join(layer for layer in layers if layer)
 
@@ -186,6 +205,8 @@ def build_scene_prompt(
     negative_prompt = "，".join(FOOD_NEGATIVE_CONSTRAINTS)
     if include_hotpot_constraints:
         negative_prompt += "，" + "，".join(HOTPOT_NEGATIVE_CONSTRAINTS)
+    else:
+        negative_prompt += "，" + "，".join(NON_HOTPOT_NEGATIVE_CONSTRAINTS)
     if negative_tags:
         negative_prompt += "，" + "，".join(negative_tags)
 
@@ -229,11 +250,19 @@ def build_multi_video_prompts(
     include_hotpot = is_hotpot if is_hotpot is not None else is_hotpot_scene(scene_prompt)
 
     if quantity == 1:
+        if include_hotpot:
+            camera_motion = "镜头在餐厅场景中自然移动"
+            lighting = "温暖电影感灯光，食物高光诱人"
+            scene = "真实用餐氛围，顾客自然走动"
+        else:
+            camera_motion = "镜头在门店场景中自然移动"
+            lighting = "温暖电影感灯光，产品高光诱人"
+            scene = "真实门店氛围，顾客自然走动，高人气忙碌感"
         result = build_scene_prompt(
             scene_prompt=scene_prompt,
-            camera_motion="镜头在餐厅场景中自然移动",
-            lighting="温暖电影感灯光，食物高光诱人",
-            scene="真实用餐氛围，顾客自然走动",
+            camera_motion=camera_motion,
+            lighting=lighting,
+            scene=scene,
             has_reference_image=has_reference_image,
             include_hotpot_constraints=include_hotpot,
         )
@@ -241,24 +270,44 @@ def build_multi_video_prompts(
         prompts.append(result)
 
     elif quantity >= 2:
-        styles = [
-            {
-                "name": "写实风格",
-                "camera_motion": "手持镜头穿过拥挤过道，跟随服务员端锅底",
-                "lighting": "暖色吊灯与自然窗光，纪录片写实感",
-                "scene": "热闹真实的火锅店，木质餐桌，顾客用餐，可见蒸汽和翻滚汤底",
-                "style_tags": REALISTIC_STYLE_TAGS,
-                "negative_tags": REALISTIC_NEGATIVE_TAGS,
-            },
-            {
-                "name": "仿真人风格",
-                "camera_motion": "平滑电影级轨道镜头，数字人服务员端锅走向餐桌",
-                "lighting": "棚拍三点布光，精致商业调色，浅景深",
-                "scene": "虚拟制片火锅店场景，超写实数字人员工和顾客，高端广告质感",
-                "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
-                "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
-            },
-        ]
+        if include_hotpot:
+            styles = [
+                {
+                    "name": "写实风格",
+                    "camera_motion": "手持镜头穿过拥挤过道，跟随服务员端锅底",
+                    "lighting": "暖色吊灯与自然窗光，纪录片写实感",
+                    "scene": "热闹真实的火锅店，木质餐桌，顾客用餐，可见蒸汽和翻滚汤底",
+                    "style_tags": REALISTIC_STYLE_TAGS,
+                    "negative_tags": REALISTIC_NEGATIVE_TAGS,
+                },
+                {
+                    "name": "仿真人风格",
+                    "camera_motion": "平滑电影级轨道镜头，数字人服务员端锅走向餐桌",
+                    "lighting": "棚拍三点布光，精致商业调色，浅景深",
+                    "scene": "虚拟制片火锅店场景，超写实数字人员工和顾客，高端广告质感",
+                    "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
+                    "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
+                },
+            ]
+        else:
+            styles = [
+                {
+                    "name": "写实风格",
+                    "camera_motion": "手持镜头穿过拥挤过道，跟随店员忙碌服务",
+                    "lighting": "暖色店内灯光与自然窗光，纪录片写实感",
+                    "scene": "热闹真实的门店，顾客排队等候，店员忙碌制作，产品特写，高人气氛围",
+                    "style_tags": REALISTIC_STYLE_TAGS,
+                    "negative_tags": REALISTIC_NEGATIVE_TAGS,
+                },
+                {
+                    "name": "仿真人风格",
+                    "camera_motion": "平滑电影级轨道镜头，数字人店员展示产品并服务顾客",
+                    "lighting": "棚拍三点布光，精致商业调色，浅景深",
+                    "scene": "虚拟制片门店场景，超写实数字人员工和顾客，高端广告质感",
+                    "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
+                    "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
+                },
+            ]
 
         for i in range(min(quantity, 2)):
             style = styles[i]
@@ -331,11 +380,20 @@ def enhance_video_prompt(
             "ratio": aspect_ratio,
         }
 
+    if include_hotpot:
+        camera_motion = "镜头在餐厅场景中自然移动"
+        lighting = "温暖电影感灯光，食物高光诱人"
+        scene = "真实用餐氛围，顾客自然走动"
+    else:
+        camera_motion = "镜头在门店场景中自然移动"
+        lighting = "温暖电影感灯光，产品高光诱人"
+        scene = "真实门店氛围，顾客自然走动，高人气忙碌感"
+
     result = build_scene_prompt(
         scene_prompt=scene_prompt,
-        camera_motion="镜头在场景中自然移动",
-        lighting="温暖电影感灯光与自然高光",
-        scene="真实餐厅用餐氛围",
+        camera_motion=camera_motion,
+        lighting=lighting,
+        scene=scene,
         has_reference_image=has_reference_image,
         include_hotpot_constraints=include_hotpot,
     )

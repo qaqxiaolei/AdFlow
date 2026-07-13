@@ -7,7 +7,7 @@ from services.config_service import FILES_DIR
 from PIL import Image
 from io import BytesIO
 import os
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 import httpx
 import aiofiles
 from mimetypes import guess_type
@@ -146,12 +146,21 @@ def compress_image(img: Image.Image, max_size_mb: float) -> bytes:
 
 # 文件下载接口
 @router.get("/file/{file_id}")
-async def get_file(file_id: str):
+async def get_file(file_id: str, download: bool = Query(False)):
     file_path = os.path.join(FILES_DIR, f'{file_id}')
     print('🦄get_file file_path', file_path)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path)
+
+    media_type, _ = guess_type(file_path)
+    if download:
+        return FileResponse(
+            file_path,
+            media_type=media_type or 'application/octet-stream',
+            filename=file_id,
+        )
+
+    return FileResponse(file_path, media_type=media_type)
 
 
 @router.post("/comfyui/object_info")

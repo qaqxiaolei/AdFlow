@@ -158,8 +158,11 @@ print('Creating socketio app')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app, socketio_path='/socket.io')
 
 if __name__ == "__main__":
-    # bypass localhost request for proxy, fix ollama proxy issue
-    _bypass = {"127.0.0.1", "localhost", "::1"}
+    # bypass localhost / 火山方舟等直连域名，避免系统代理干扰
+    _bypass = {
+        "127.0.0.1", "localhost", "::1",
+        ".volces.com", "ark.cn-beijing.volces.com",
+    }
     current = set(os.environ.get("no_proxy", "").split(",")) | set(
         os.environ.get("NO_PROXY", "").split(","))
     os.environ["no_proxy"] = os.environ["NO_PROXY"] = ",".join(

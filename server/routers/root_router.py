@@ -1,31 +1,48 @@
 import os
 from fastapi import APIRouter
-import requests
 import httpx
 from models.tool_model import ToolInfoJson
 from services.tool_service import tool_service
 from services.config_service import config_service
 from services.db_service import db_service
+from services.model_list_cache import (
+    get_cached_models,
+    get_cached_ollama_models,
+    get_cached_tools,
+    set_cached_models,
+    set_cached_ollama_models,
+    set_cached_tools,
+    should_log_ollama_failure,
+)
 from utils.http_client import HttpClient
 # services
 from models.config_model import ModelInfo
 from typing import List
-from services.tool_service import TOOL_MAPPING
 from fastapi import Request
 
 router = APIRouter(prefix="/api")
 
 
-def get_ollama_model_list() -> List[str]:
-    base_url = config_service.get_config().get('ollama', {}).get(
-        'url', os.getenv('OLLAMA_HOST', 'http://localhost:11434'))
+async def get_ollama_model_list(base_url: str) -> List[str]:
+    cached = get_cached_ollama_models()
+    if cached is not None:
+        return cached
+
     try:
-        response = requests.get(f'{base_url}/api/tags', timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        return [model['name'] for model in data.get('models', [])]
-    except requests.RequestException as e:
-        print(f"Error querying Ollama: {e}")
+        timeout = httpx.Timeout(2.0, connect=1.0)
+        async with HttpClient.create(timeout=timeout) as client:
+            response = await client.get(f'{base_url.rstrip("/")}/api/tags')
+            response.raise_for_status()
+            data = response.json()
+            models = [model['name'] for model in data.get('models', [])]
+            set_cached_ollama_models(models, failed=False)
+            return models
+    except Exception as e:
+        if should_log_ollama_failure():
+            print(
+                f"Ollama unavailable at {base_url}, skipping for 5 min: {e}"
+            )
+        set_cached_ollama_models([], failed=True)
         return []
 
 
@@ -51,6 +68,10 @@ async def get_comfyui_model_list(base_url: str) -> List[str]:
 # List all LLM models
 @router.get("/list_models")
 async def get_models() -> list[ModelInfo]:
+    cached = get_cached_models()
+    if cached is not None:
+        return cached
+
     config = config_service.get_config()
     res: List[ModelInfo] = []
 
@@ -59,7 +80,7 @@ async def get_models() -> list[ModelInfo]:
         'url', os.getenv('OLLAMA_HOST', 'http://localhost:11434'))
     # Add Ollama models if URL is available
     if ollama_url and ollama_url.strip():
-        ollama_models = get_ollama_model_list()
+        ollama_models = await get_ollama_model_list(ollama_url)
         for ollama_model in ollama_models:
             res.append({
                 'provider': 'ollama',
@@ -92,11 +113,16 @@ async def get_models() -> list[ModelInfo]:
                     'url': provider_url,
                     'type': model_type
                 })
+    set_cached_models(res)
     return res
 
 
 @router.get("/list_tools")
 async def list_tools() -> list[ToolInfoJson]:
+    cached = get_cached_tools()
+    if cached is not None:
+        return cached
+
     config = config_service.get_config()
     res: list[ToolInfoJson] = []
     for tool_id, tool_info in tool_service.tools.items():
@@ -113,21 +139,7 @@ async def list_tools() -> list[ToolInfoJson]:
             'display_name': tool_info.get('display_name', ''),
         })
 
-    # Handle ComfyUI models separately
-    # comfyui_config = config.get('comfyui', {})
-    # comfyui_url = comfyui_config.get('url', '').strip()
-    # comfyui_config_models = comfyui_config.get('models', {})
-    # if comfyui_url:
-    #     comfyui_models = await get_comfyui_model_list(comfyui_url)
-    #     for comfyui_model in comfyui_models:
-    #         if comfyui_model in comfyui_config_models:
-    #             res.append({
-    #                 'provider': 'comfyui',
-    #                 'model': comfyui_model,
-    #                 'url': comfyui_url,
-    #                 'type': 'image'
-    #             })
-
+    set_cached_tools(res)
     return res
 
 

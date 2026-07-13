@@ -9,7 +9,12 @@ from typing import Dict, Any, List
 from services.db_service import db_service
 from services.OpenAIAgents_service import create_jaaz_response
 from services.websocket_service import send_to_websocket  # type: ignore
-from services.stream_service import add_stream_task, remove_stream_task
+from services.stream_service import (
+    add_stream_task,
+    remove_stream_task,
+    update_session_progress,
+    clear_session_progress,
+)
 
 
 async def handle_magic(data: Dict[str, Any]) -> None:
@@ -58,6 +63,7 @@ async def handle_magic(data: Dict[str, Any]) -> None:
 
     # Register the task in stream_tasks (for possible cancellation)
     add_stream_task(session_id, task)
+    update_session_progress(session_id, pending_type="text")
     try:
         # Await completion of the magic generation task
         await task
@@ -66,6 +72,7 @@ async def handle_magic(data: Dict[str, Any]) -> None:
     finally:
         # Always remove the task from stream_tasks after completion/cancellation
         remove_stream_task(session_id)
+        clear_session_progress(session_id)
         # Notify frontend WebSocket that magic generation is done
         await send_to_websocket(session_id, {'type': 'done'})
 

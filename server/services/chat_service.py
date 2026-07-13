@@ -11,7 +11,12 @@ from services.db_service import db_service
 from services.langgraph_service import langgraph_multi_agent
 from services.tool_service import tool_service
 from services.websocket_service import send_to_websocket
-from services.stream_service import add_stream_task, remove_stream_task
+from services.stream_service import (
+    add_stream_task,
+    remove_stream_task,
+    update_session_progress,
+    clear_session_progress,
+)
 from models.config_model import ModelInfo
 
 
@@ -57,16 +62,28 @@ async def handle_chat(data: Dict[str, Any]) -> None:
     system_prompt: Optional[str] = data.get('system_prompt')
     # 如果只有一条消息，创建一个新的聊天会话
     if len(messages) == 1:
-        # 创建新的聊天会话
-        prompt = messages[0].get('content', '')
-        # 更好的方式来确定何时创建新的聊天会话。
-        await db_service.create_chat_session(session_id, text_model.get('model'), text_model.get('provider'), canvas_id, (prompt[:200] if isinstance(prompt, str) else ''))
+        from services.canvas_cover_service import (
+            schedule_canvas_cover_generation,
+            extract_prompt_from_messages,
+            build_canvas_name_from_prompt,
+        )
+        prompt_text = extract_prompt_from_messages(messages)
+        title = build_canvas_name_from_prompt(prompt_text)
+        await db_service.create_chat_session(
+            session_id,
+            text_model.get('model'),
+            text_model.get('provider'),
+            canvas_id,
+            title,
+        )
+        schedule_canvas_cover_generation(canvas_id, messages)
     await db_service.create_message(session_id, messages[-1].get('role', 'user'), json.dumps(messages[-1])) if len(messages) > 0 else None
     # 创建并启动 langgraph_agent 任务来处理聊天请求
     task = asyncio.create_task(langgraph_multi_agent(
         messages, canvas_id, session_id, text_model, tool_list, system_prompt))
     # 将任务注册到 stream_tasks 中（用于可能的取消）
     add_stream_task(session_id, task)
+    update_session_progress(session_id, pending_type="text")
     try:
         # 等待 langgraph_agent 任务完成
         await task
@@ -75,6 +92,7 @@ async def handle_chat(data: Dict[str, Any]) -> None:
     finally:
         # 在任务完成/取消后，从 stream_tasks 中移除任务
         remove_stream_task(session_id)
+        clear_session_progress(session_id)
         # 通过 WebSocket 通知前端聊天处理已完成
         await send_to_websocket(session_id, {
             'type': 'done'
