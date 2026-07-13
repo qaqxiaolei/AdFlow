@@ -1,4 +1,4 @@
-import { sendMessages } from '@/api/chat'
+import { sendMessages, getChatSessionStatus } from '@/api/chat'
 import Blur from '@/components/common/Blur'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { eventBus, TEvents } from '@/lib/event'
@@ -79,6 +79,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const [pending, setPending] = useState<PendingType>(
         initCanvas ? 'text' : false
     )
+    const [initialProgress, setInitialProgress] = useState('')
     const mergedToolCallIds = useRef<string[]>([])
     const sessionId = session?.id ?? searchSessionId
 
@@ -89,6 +90,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     >([])
     const scrollRef = useRef<HTMLDivElement>(null)
     const isAtBottomRef = useRef(false)
+    const visibilityRestoreTimerRef = useRef<number | null>(null)
     const scrollToBottom = useCallback(() => {
         if (!isAtBottomRef.current) {
             return
@@ -122,6 +124,50 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         })
         return messagesWithToolCallResult
     }
+
+    const hasIncompleteToolCalls = (messages: Message[]) => {
+        for (const message of messages) {
+            if (message.role !== 'assistant' || !message.tool_calls) {
+                continue
+            }
+            for (const toolCall of message.tool_calls) {
+                if (!toolCall.result) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    const restoreSessionStatus = useCallback(
+        async (sid: string, msgs: Message[]) => {
+            try {
+                const status = await getChatSessionStatus(sid)
+                if (status.running) {
+                    const pendingType: PendingType =
+                        status.pending_type === 'text' ||
+                        status.pending_type === 'image' ||
+                        status.pending_type === 'tool'
+                            ? status.pending_type
+                            : 'tool'
+                    setPending(pendingType)
+                    if (status.last_progress) {
+                        setInitialProgress(status.last_progress)
+                    }
+                    return
+                }
+                if (hasIncompleteToolCalls(msgs)) {
+                    setPending('tool')
+                }
+            } catch (error) {
+                console.error('Failed to restore session status:', error)
+                if (hasIncompleteToolCalls(msgs)) {
+                    setPending('tool')
+                }
+            }
+        },
+        []
+    )
 
     const handleDelta = useCallback(
         (data: TEvents['Socket::Session::Delta']) => {
@@ -363,6 +409,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         [canvasId, sessionId]
     )
 
+    const handleToolCallProgress = useCallback(
+        (data: TEvents['Socket::Session::ToolCallProgress']) => {
+            if (data.session_id && data.session_id !== sessionId) {
+                return
+            }
+            setPending('tool')
+        },
+        [sessionId]
+    )
+
+    const handleVideoGenerationStarted = useCallback(
+        (data: TEvents['Socket::Session::VideoGenerationStarted']) => {
+            if (data.session_id && data.session_id !== sessionId) {
+                return
+            }
+            setPending('tool')
+            if (data.message) {
+                setInitialProgress(data.message)
+            }
+        },
+        [sessionId]
+    )
+
     const handleImageGenerated = useCallback(
         (data: TEvents['Socket::Session::ImageGenerated']) => {
             if (
@@ -433,6 +502,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 return
             }
             setPending(false)
+            setInitialProgress('')
             scrollToBottom()
 
             // 聊天输出完毕后更新余额
@@ -445,6 +515,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     const handleError = useCallback((data: TEvents['Socket::Session::Error']) => {
         setPending(false)
+        setInitialProgress('')
         // 视频生成类错误已在对话中由 AI 说明，不再弹红色阻断提示
         if (
             /视频生成|video generation/i.test(data.error) &&
@@ -487,6 +558,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         eventBus.on('Socket::Session::ToolCallCancelled', handleToolCallCancelled)
         eventBus.on('Socket::Session::ToolCallArguments', handleToolCallArguments)
         eventBus.on('Socket::Session::ToolCallResult', handleToolCallResult)
+        eventBus.on('Socket::Session::ToolCallProgress', handleToolCallProgress)
+        eventBus.on(
+            'Socket::Session::VideoGenerationStarted',
+            handleVideoGenerationStarted
+        )
         eventBus.on('Socket::Session::ImageGenerated', handleImageGenerated)
         eventBus.on('Socket::Session::VideoGenerated', handleVideoGenerated)
         eventBus.on('Socket::Session::AllMessages', handleAllMessages)
@@ -515,6 +591,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 handleToolCallArguments
             )
             eventBus.off('Socket::Session::ToolCallResult', handleToolCallResult)
+            eventBus.off(
+                'Socket::Session::ToolCallProgress',
+                handleToolCallProgress
+            )
+            eventBus.off(
+                'Socket::Session::VideoGenerationStarted',
+                handleVideoGenerationStarted
+            )
             eventBus.off('Socket::Session::ImageGenerated', handleImageGenerated)
             eventBus.off('Socket::Session::VideoGenerated', handleVideoGenerated)
             eventBus.off('Socket::Session::AllMessages', handleAllMessages)
@@ -530,19 +614,44 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             return
         }
         sessionIdRef.current = sessionId
+        setPending(false)
+        setInitialProgress('')
         const resp = await fetch('/api/chat_session/' + sessionId)
         const data = await resp.json()
         const msgs = data?.length ? data : []
-        setMessages(mergeToolCallResult(msgs))
+        const mergedMsgs = mergeToolCallResult(msgs)
+        setMessages(mergedMsgs)
         if (msgs.length > 0) {
             setInitCanvas(false)
         }
+        await restoreSessionStatus(sessionId, mergedMsgs)
         scrollToBottom()
-    }, [sessionId, scrollToBottom, setInitCanvas])
+    }, [sessionId, scrollToBottom, setInitCanvas, restoreSessionStatus])
 
     useEffect(() => {
         initChat()
     }, [sessionId, initChat])
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== 'visible' || !sessionId) {
+                return
+            }
+            if (visibilityRestoreTimerRef.current) {
+                window.clearTimeout(visibilityRestoreTimerRef.current)
+            }
+            visibilityRestoreTimerRef.current = window.setTimeout(() => {
+                restoreSessionStatus(sessionId, messages)
+            }, 1500)
+        }
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
+            if (visibilityRestoreTimerRef.current) {
+                window.clearTimeout(visibilityRestoreTimerRef.current)
+            }
+        }
+    }, [sessionId, messages, restoreSessionStatus])
 
     const onSelectSession = (sessionId: string) => {
         setSession(sessionList.find((s) => s.id === sessionId) || null)
@@ -598,8 +707,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     return (
         <PhotoProvider>
-            <div className='flex flex-col flex-1 relative w-full h-full'>
-                <div className='flex flex-col w-full h-full lg:mx-auto lg:w-[80%] lg:h-[calc(100vh-2rem-32px)] lg:rounded-2xl lg:shadow-xl lg:border lg:border-border overflow-hidden'>
+            <div className='flex flex-col flex-1 relative w-full min-h-0'>
+                <div className='flex flex-col w-full flex-1 min-h-0 lg:mx-auto lg:w-[80%] lg:h-[calc(100vh-2rem-32px)] lg:rounded-2xl lg:shadow-xl lg:border lg:border-border overflow-hidden'>
                     <header className='flex items-center px-3 py-2 sm:px-4 sm:py-3 relative z-10 bg-background/80 backdrop-blur-sm border-b border-border/50'>
                         <div className='flex-1 min-w-0'>
                             <SessionSelector
@@ -708,8 +817,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                     </div>
                                 ))}
                                 {pending && <ChatSpinner pending={pending} />}
-                                {pending && sessionId && (
-                                    <ToolcallProgressUpdate sessionId={sessionId} />
+                                {(pending || initialProgress) && sessionId && (
+                                    <ToolcallProgressUpdate
+                                        sessionId={sessionId}
+                                        initialProgress={initialProgress}
+                                    />
                                 )}
                             </div>
                         ) : (
@@ -734,7 +846,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         )}
                     </ScrollArea>
 
-                    <div className='relative px-3 py-2 sm:p-3 gap-3 bg-background border-t border-border z-50 pb-[max(0.5rem,env(safe-area-inset-bottom))]'>
+                    <div className='relative shrink-0 px-3 py-2 sm:p-3 gap-3 bg-background border-t border-border z-50 pb-[max(0.5rem,env(safe-area-inset-bottom))]'>
                         <ChatTextarea
                             sessionId={sessionId!}
                             pending={!!pending}

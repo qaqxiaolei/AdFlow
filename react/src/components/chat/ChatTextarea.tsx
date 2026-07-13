@@ -439,7 +439,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     <motion.div
       ref={dropAreaRef}
       className={cn(
-        'w-full flex flex-col items-center border border-primary/20 rounded-2xl p-2.5 sm:p-3 hover:border-primary/40 transition-all duration-300 cursor-text gap-3 sm:gap-5 bg-background/80 backdrop-blur-xl relative',
+        'w-full flex flex-col items-center border border-primary/20 rounded-2xl p-2.5 sm:p-3 hover:border-primary/40 transition-all duration-300 cursor-text gap-2.5 sm:gap-5 bg-background/80 backdrop-blur-xl relative',
         isFocused && 'border-primary/40',
         className
       )}
@@ -540,7 +540,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       />
 
       <div
-        className="flex items-center justify-between gap-1.5 w-full min-w-0 touch-manipulation"
+        className="flex items-center justify-between gap-1.5 w-full min-w-0 touch-manipulation shrink-0"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >

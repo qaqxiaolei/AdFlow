@@ -21,15 +21,41 @@ function isVideoGeneratingProgress(text: string): boolean {
   return VIDEO_GENERATING_HINT.test(text) || WAITING_ELAPSED_PATTERN.test(text)
 }
 
+function VideoProgressCard({ elapsedSeconds }: { elapsedSeconds: number }) {
+  return (
+    <div className="w-full overflow-hidden rounded-xl border border-violet-200/70 bg-gradient-to-r from-violet-50 via-purple-50 to-violet-50 shadow-sm dark:border-violet-800/50 dark:from-violet-950/50 dark:via-purple-950/40 dark:to-violet-950/50">
+      <div className="flex items-center gap-2.5 px-3.5 py-2.5">
+        <Loader2 className="size-4 shrink-0 animate-spin text-violet-600 dark:text-violet-400" />
+        <p className="min-w-0 flex-1 text-sm leading-snug text-violet-900/90 dark:text-violet-100/90">
+          视频生成中
+          <span className="ml-1.5 tabular-nums font-medium text-violet-600 dark:text-violet-300">
+            （已等待 {elapsedSeconds} 秒）
+          </span>
+        </p>
+      </div>
+      <div className="relative h-1 overflow-hidden bg-violet-100/80 dark:bg-violet-900/40">
+        <div className="toolcall-progress-indeterminate absolute inset-y-0 w-2/5 rounded-full bg-gradient-to-r from-transparent via-violet-400 to-transparent dark:via-violet-500" />
+      </div>
+    </div>
+  )
+}
+
 export default function ToolcallProgressUpdate({
   sessionId,
+  initialProgress = '',
 }: {
   sessionId: string
+  initialProgress?: string
 }) {
-  const [rawProgress, setRawProgress] = useState('')
+  const [rawProgress, setRawProgress] = useState(initialProgress)
   const [elapsedSeconds, setElapsedSeconds] = useState<number | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
   const waitStartedAtRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (initialProgress) {
+      setRawProgress(initialProgress)
+    }
+  }, [initialProgress])
 
   useEffect(() => {
     const handleToolCallProgress = (
@@ -51,18 +77,15 @@ export default function ToolcallProgressUpdate({
     if (!cleaned) {
       waitStartedAtRef.current = null
       setElapsedSeconds(null)
-      setIsGenerating(false)
       return
     }
 
     if (!isVideoGeneratingProgress(cleaned)) {
       waitStartedAtRef.current = null
       setElapsedSeconds(null)
-      setIsGenerating(false)
       return
     }
 
-    setIsGenerating(true)
     const serverElapsed = parseWaitingElapsed(cleaned)
     if (serverElapsed !== null) {
       // 用服务端秒数校准本地计时，之后每秒本地递增
@@ -85,20 +108,13 @@ export default function ToolcallProgressUpdate({
     return () => window.clearInterval(timer)
   }, [rawProgress])
 
-  if (!isGenerating || elapsedSeconds === null) {
-    const plain = stripInternalDetails(rawProgress)
-    if (!plain) return null
-    if (isVideoGeneratingProgress(plain)) return null
-    return (
-      <div className="w-full overflow-hidden rounded-xl border border-violet-200/70 bg-gradient-to-r from-violet-50 via-purple-50 to-violet-50 shadow-sm dark:border-violet-800/50 dark:from-violet-950/50 dark:via-purple-950/40 dark:to-violet-950/50">
-        <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-          <Loader2 className="size-4 shrink-0 animate-spin text-violet-600 dark:text-violet-400" />
-          <p className="min-w-0 flex-1 text-sm leading-snug text-violet-900/90 dark:text-violet-100/90">
-            {plain}
-          </p>
-        </div>
-      </div>
-    )
+  const plain = stripInternalDetails(rawProgress)
+  if (!plain) return null
+
+  if (isVideoGeneratingProgress(plain)) {
+    const displayElapsed =
+      elapsedSeconds ?? parseWaitingElapsed(plain) ?? 0
+    return <VideoProgressCard elapsedSeconds={displayElapsed} />
   }
 
   return (
@@ -106,14 +122,8 @@ export default function ToolcallProgressUpdate({
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         <Loader2 className="size-4 shrink-0 animate-spin text-violet-600 dark:text-violet-400" />
         <p className="min-w-0 flex-1 text-sm leading-snug text-violet-900/90 dark:text-violet-100/90">
-          视频生成中
-          <span className="ml-1.5 tabular-nums font-medium text-violet-600 dark:text-violet-300">
-            （已等待 {elapsedSeconds} 秒）
-          </span>
+          {plain}
         </p>
-      </div>
-      <div className="relative h-1 overflow-hidden bg-violet-100/80 dark:bg-violet-900/40">
-        <div className="toolcall-progress-indeterminate absolute inset-y-0 w-2/5 rounded-full bg-gradient-to-r from-transparent via-violet-400 to-transparent dark:via-violet-500" />
       </div>
     </div>
   )

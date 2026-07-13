@@ -1,5 +1,6 @@
 import { listModels, ModelInfo, ToolInfo } from '@/api/model'
 import useConfigsStore from '@/stores/configs'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { useQuery } from '@tanstack/react-query'
 import { createContext, useContext, useEffect, useRef } from 'react'
 
@@ -25,11 +26,12 @@ export const ConfigsProvider = ({
 
   // 存储上一次的 allTools 值，用于检测新添加的工具，并自动选中
   const previousAllToolsRef = useRef<ModelInfo[]>([])
+  const isMobile = useIsMobile()
 
   const { data: modelList, refetch: refreshModels, isFetching, isError } = useQuery({
     queryKey: ['list_models_v3'],
     queryFn: () => listModels(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: isMobile ? 10 * 60 * 1000 : 5 * 60 * 1000,
     placeholderData: (previousData) => {
       if (
         previousData &&
@@ -39,10 +41,10 @@ export const ConfigsProvider = ({
       }
       return undefined
     },
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    refetchOnMount: 'always',
-    retry: 3,
+    refetchOnWindowFocus: !isMobile,
+    refetchOnReconnect: !isMobile,
+    refetchOnMount: isMobile ? false : 'always',
+    retry: isMobile ? 1 : 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   })
 

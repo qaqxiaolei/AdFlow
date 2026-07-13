@@ -7,6 +7,8 @@ export type ListCanvasesResponse = {
   description?: string
   thumbnail?: string
   created_at: string
+  updated_at?: string
+  session_id?: string
 }
 
 export async function listCanvases(): Promise<ListCanvasesResponse[]> {

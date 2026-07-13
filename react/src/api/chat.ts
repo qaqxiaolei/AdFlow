@@ -1,4 +1,4 @@
-import { Message, Model } from '@/types/types'
+import { Message, Model, PendingType } from '@/types/types'
 import { ModelInfo, ToolInfo } from './model'
 
 export const getChatSession = async (sessionId: string) => {
@@ -38,6 +38,20 @@ export const cancelChat = async (sessionId: string) => {
     method: 'POST',
   })
   return await response.json()
+}
+
+export type ChatSessionStatus = {
+  running: boolean
+  last_progress?: string
+  pending_type?: PendingType
+}
+
+export const getChatSessionStatus = async (sessionId: string) => {
+  const response = await fetch(`/api/chat/status/${sessionId}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch chat session status')
+  }
+  return (await response.json()) as ChatSessionStatus
 }
 
 export const renameChatSession = async (sessionId: string, title: string) => {

@@ -100,6 +100,12 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         configure: (proxy) => proxyErrorHandler(proxy, 'http'),
       },
+      '/socket.io': {
+        target: `http://127.0.0.1:${PORT}`,
+        ws: true,
+        changeOrigin: true,
+        configure: (proxy) => proxyErrorHandler(proxy, 'socket.io'),
+      },
       '/ws': {
         target: `ws://127.0.0.1:${PORT}`,
         ws: true,

@@ -37,6 +37,7 @@ export type TEvents = {
   'Socket::Session::ToolCallResult': ISocket.SessionToolCallResultEvent
   'Socket::Session::AllMessages': ISocket.SessionAllMessagesEvent
   'Socket::Session::ToolCallProgress': ISocket.SessionToolCallProgressEvent
+  'Socket::Session::VideoGenerationStarted': ISocket.SessionVideoGenerationStartedEvent
   'Socket::Session::ToolCallPendingConfirmation': ISocket.SessionToolCallPendingConfirmationEvent
   'Socket::Session::ToolCallConfirmed': ISocket.SessionToolCallConfirmedEvent
   'Socket::Session::ToolCallCancelled': ISocket.SessionToolCallCancelledEvent

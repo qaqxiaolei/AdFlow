@@ -14,6 +14,7 @@ export enum SessionEventType {
   ToolCallResult = 'tool_call_result',
   AllMessages = 'all_messages',
   ToolCallProgress = 'tool_call_progress',
+  VideoGenerationStarted = 'video_generation_started',
   ToolCallPendingConfirmation = 'tool_call_pending_confirmation',
   ToolCallConfirmed = 'tool_call_confirmed',
   ToolCallCancelled = 'tool_call_cancelled',
@@ -78,6 +79,11 @@ export interface SessionToolCallProgressEvent extends SessionBaseEvent {
   update: string
 }
 
+export interface SessionVideoGenerationStartedEvent extends SessionBaseEvent {
+  type: SessionEventType.VideoGenerationStarted
+  message: string
+}
+
 export interface SessionToolCallPendingConfirmationEvent
   extends SessionBaseEvent {
   type: SessionEventType.ToolCallPendingConfirmation
@@ -101,6 +107,7 @@ export type SessionUpdateEvent =
   | SessionToolCallEvent
   | SessionToolCallArgumentsEvent
   | SessionToolCallProgressEvent
+  | SessionVideoGenerationStartedEvent
   | SessionImageGeneratedEvent
   | SessionVideoGeneratedEvent
   | SessionAllMessagesEvent

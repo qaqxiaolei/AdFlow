@@ -13,7 +13,9 @@
   "messages": {
     "imagePositioning": "Go to image",
     "showMore": "Show More",
-    "showLess": "Show Less"
+    "showLess": "Show Less",
+    "videoDownload": "Save video",
+    "videoDownloadFailed": "Save failed. Long-press the video to save it."
   },
   "thinking": {
     "title": "Thinking"

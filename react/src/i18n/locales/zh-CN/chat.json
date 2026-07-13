@@ -13,7 +13,9 @@
   "messages": {
     "imagePositioning": "定位到图片",
     "showMore": "显示更多",
-    "showLess": "收起"
+    "showLess": "收起",
+    "videoDownload": "保存视频",
+    "videoDownloadFailed": "保存失败，请长按视频选择保存"
   },
   "thinking": {
     "title": "思考过程"

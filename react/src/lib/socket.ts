@@ -29,8 +29,7 @@ export class SocketIOManager {
       }
 
       this.socket = io(url, {
-        transports: ['websocket'],
-        upgrade: false,
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
@@ -115,6 +114,9 @@ export class SocketIOManager {
         break
       case ISocket.SessionEventType.ToolCallProgress:
         eventBus.emit('Socket::Session::ToolCallProgress', data)
+        break
+      case ISocket.SessionEventType.VideoGenerationStarted:
+        eventBus.emit('Socket::Session::VideoGenerationStarted', data)
         break
       case ISocket.SessionEventType.ImageGenerated:
         eventBus.emit('Socket::Session::ImageGenerated', data)

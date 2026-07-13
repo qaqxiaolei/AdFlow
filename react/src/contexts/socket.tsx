@@ -20,11 +20,20 @@ interface SocketProviderProps {
   children: React.ReactNode
 }
 
+const BACKEND_PORT = 57988
+
+function isLocalNetworkHost(hostname: string) {
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return true
+  }
+  return /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(hostname)
+}
+
 function getSocketServerUrl() {
-  const hostname = window.location.hostname
-  const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1'
-  if (import.meta.env.DEV && isLocalHost) {
-    return 'http://localhost:57988'
+  const { hostname, protocol } = window.location
+  if (import.meta.env.DEV && isLocalNetworkHost(hostname)) {
+    // 开发模式下手机/局域网访问 Vite 时，Socket 需直连后端端口
+    return `${protocol}//${hostname}:${BACKEND_PORT}`
   }
   return window.location.origin
 }

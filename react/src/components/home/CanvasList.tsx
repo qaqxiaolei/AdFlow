@@ -16,9 +16,18 @@ const CanvasList: React.FC = () => {
     const { data: canvases, refetch } = useQuery({
         queryKey: ['canvases'],
         queryFn: listCanvases,
-        enabled: isHomePage, // 每次进入首页时都重新查询
+        enabled: isHomePage,
         refetchOnMount: 'always',
+        refetchInterval: (query) => {
+            const items = query.state.data
+            if (items?.some((canvas) => !canvas.thumbnail)) {
+                return 3000
+            }
+            return false
+        },
     })
+
+    const recentCanvases = canvases?.slice(0, 3) ?? []
 
     const navigate = useNavigate()
     const handleCanvasClick = (id: string, sessionId: string) => {
@@ -31,7 +40,7 @@ const CanvasList: React.FC = () => {
 
     return (
         <div className="flex flex-col px-4 sm:px-6 lg:px-10 mt-6 sm:mt-10 gap-4 select-none max-w-[1200px] mx-auto w-full">
-            {canvases && canvases.length > 0 && (
+            {recentCanvases.length > 0 && (
                 <motion.span
                     className="text-2xl font-bold"
                     initial={{ opacity: 0, y: 10 }}
@@ -42,13 +51,13 @@ const CanvasList: React.FC = () => {
                 </motion.span>
             )}
             <AnimatePresence>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 w-full pb-6 sm:pb-10">
-                    {canvases?.map((canvas, index) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 w-full pb-6 sm:pb-10">
+                    {recentCanvases.map((canvas, index) => (
                         <CanvasCard
                             key={canvas.id}
                             index={index}
                             canvas={canvas}
-                            handleCanvasClick={() => handleCanvasClick(canvas.id, canvas.session_id)}
+                            handleCanvasClick={() => handleCanvasClick(canvas.id, canvas.session_id || '')}
                             handleDeleteCanvas={() => refetch()}
                         />
                     ))}

@@ -3,6 +3,7 @@ import ReactMarkdown, { Components } from 'react-markdown'
 import { PhotoView } from 'react-photo-view'
 import remarkGfm from 'remark-gfm'
 import TextFoldTag from './Message/TextFoldTag'
+import ChatVideo from './Message/ChatVideo'
 
 type MarkdownProps = {
     children: string
@@ -194,17 +195,10 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
 
             if (isVideo) {
                 return (
-                    <span className="group block relative overflow-hidden rounded-md my-2 last:mb-4">
-                        <video
-                            className="w-full max-w-full h-auto rounded-md cursor-pointer group-hover:scale-105 transition-transform duration-300"
-                            controls
-                            preload="metadata"
-                            src={normalizedSrc}
-                            {...(props.alt && { title: props.alt })}
-                        >
-                            Your browser does not support the video tag.
-                        </video>
-                    </span>
+                    <ChatVideo
+                        src={normalizedSrc}
+                        title={typeof props.alt === 'string' ? props.alt : undefined}
+                    />
                 )
             }
 
@@ -220,18 +214,8 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
             )
         },
         video: ({ node, children, ...props }) => {
-            return (
-                <span className="group block relative overflow-hidden rounded-md my-2 last:mb-4">
-                    <video
-                        className="w-full max-w-full h-auto rounded-md"
-                        controls
-                        preload="metadata"
-                        {...props}
-                    >
-                        Your browser does not support the video tag.
-                    </video>
-                </span>
-            )
+            const src = typeof props.src === 'string' ? props.src : ''
+            return <ChatVideo src={src} />
         },
     }
     // Special handling if content contains think tags

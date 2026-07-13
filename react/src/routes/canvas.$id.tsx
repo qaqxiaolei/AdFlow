@@ -32,7 +32,7 @@ function Canvas() {
     }, [id])
 
     return (
-        <div className='flex flex-col h-dvh min-h-0 overflow-hidden'>
+        <div className='flex flex-col h-svh md:h-dvh min-h-0 overflow-hidden'>
             <TopMenu />
             <ChatInterface
                 canvasId={id}
