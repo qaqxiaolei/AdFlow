@@ -215,30 +215,6 @@ def build_scene_prompt(
         "negative_prompt": negative_prompt,
     }
 
-
-def build_food_prompt(
-    main_ingredient: str,
-    camera_motion: str = "",
-    lighting: str = "",
-    scene: str = "",
-    has_reference_image: bool = False,
-    style_tags: list = None,
-    negative_tags: list = None,
-) -> dict:
-    return build_scene_prompt(
-        scene_prompt=main_ingredient,
-        camera_motion=camera_motion,
-        lighting=lighting,
-        scene=scene,
-        has_reference_image=has_reference_image,
-        style_tags=style_tags,
-        negative_tags=negative_tags,
-        include_hotpot_constraints=is_hotpot_scene(
-            " ".join(filter(None, [main_ingredient, scene, camera_motion]))
-        ),
-    )
-
-
 def build_multi_video_prompts(
     scene_prompt: str,
     quantity: int = 1,
@@ -326,30 +302,6 @@ def build_multi_video_prompts(
             prompts.append(result)
 
     return prompts
-
-
-def extract_main_ingredient(prompt: str) -> str:
-    food_keywords = [
-        "鸡", "牛", "猪", "羊", "鱼", "虾", "蔬菜",
-        "面", "饭", "饺子", "汤", "咖喱", "牛排", "汉堡",
-        "披萨", "意面", "沙拉", "三明治", "炸", "烤", "红烧",
-        "炖", "寿司", "天妇罗", "拉面", "火锅", "菜",
-        "鸡翅", "排骨", "肉", "豆腐", "蛋", "奶酪", "面包", "蛋糕",
-        "冰淇淋", "甜品", "水果", "海鲜", "酱", "香料",
-        "chicken", "beef", "pork", "hotpot", "meat", "tofu",
-    ]
-
-    lowered = prompt.lower()
-    ingredients = []
-    for keyword in food_keywords:
-        if keyword in lowered and keyword not in ingredients:
-            ingredients.append(keyword)
-
-    if ingredients:
-        return "，".join(ingredients[:3])
-
-    return "精美食物场景"
-
 
 def enhance_video_prompt(
     original_prompt: str,
