@@ -60,6 +60,7 @@ async def handle_chat(data: Dict[str, Any]) -> None:
         print('👇 聊天服务已添加搜索视频工具到工具列表')
     # 从数据库或配置文件里读取系统提示词
     system_prompt: Optional[str] = data.get('system_prompt')
+    user_id: Optional[str] = data.get('user_id')
     # 如果只有一条消息，创建一个新的聊天会话
     if len(messages) == 1:
         from services.canvas_cover_service import (
@@ -80,7 +81,7 @@ async def handle_chat(data: Dict[str, Any]) -> None:
     await db_service.create_message(session_id, messages[-1].get('role', 'user'), json.dumps(messages[-1])) if len(messages) > 0 else None
     # 创建并启动 langgraph_agent 任务来处理聊天请求
     task = asyncio.create_task(langgraph_multi_agent(
-        messages, canvas_id, session_id, text_model, tool_list, system_prompt))
+        messages, canvas_id, session_id, text_model, tool_list, system_prompt, user_id=user_id))
     # 将任务注册到 stream_tasks 中（用于可能的取消）
     add_stream_task(session_id, task)
     update_session_progress(session_id, pending_type="text")

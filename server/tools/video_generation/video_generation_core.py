@@ -58,10 +58,22 @@ async def generate_video_with_provider(
     ctx = config.get('configurable', {})
     canvas_id = ctx.get('canvas_id', '')
     session_id = ctx.get('session_id', '')
+    user_id = ctx.get('user_id')
     print(f'🛠️ canvas_id {canvas_id} session_id {session_id}')
     # 将 tool_call_id 注入上下文
     ctx['tool_call_id'] = tool_call_id
+    credits_deducted = False
     try:
+        # 登录用户生成视频前校验并预扣积分
+        if user_id:
+            from services.auth_service import VIDEO_CREDIT_COST
+            from services.db_service import db_service
+            await db_service.adjust_user_credits(
+                user_id, -VIDEO_CREDIT_COST, f"video:{model_name}"
+            )
+            credits_deducted = True
+            print(f"💳 Deducted {VIDEO_CREDIT_COST} credits from user {user_id}")
+
         # 确定使用哪个 provider
         model_info_list: List[ModelInfo] = cast(
             List[ModelInfo], ctx.get('model_info', {}).get(model_name, []))
@@ -110,6 +122,16 @@ async def generate_video_with_provider(
             tool_call_id=tool_call_id,
         )
     except Exception as e:
+        if credits_deducted and user_id:
+            try:
+                from services.auth_service import VIDEO_CREDIT_COST
+                from services.db_service import db_service
+                await db_service.adjust_user_credits(
+                    user_id, VIDEO_CREDIT_COST, f"video_refund:{model_name}"
+                )
+                print(f"💳 Refunded {VIDEO_CREDIT_COST} credits to user {user_id}")
+            except Exception as refund_err:
+                print(f"💳 Refund failed: {refund_err}")
         error_message = str(e)
         print(f"🎥 Error generating video with {model_name}: {error_message}")
         print(f"🎥 Full error traceback:")

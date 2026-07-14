@@ -1,6 +1,7 @@
-import os
-from fastapi import APIRouter
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Request
 import httpx
+import os
 from models.tool_model import ToolInfoJson
 from services.tool_service import tool_service
 from services.config_service import config_service
@@ -15,10 +16,8 @@ from services.model_list_cache import (
     should_log_ollama_failure,
 )
 from utils.http_client import HttpClient
-# services
 from models.config_model import ModelInfo
-from typing import List
-from fastapi import Request
+from routers.auth_router import get_current_user_id
 
 router = APIRouter(prefix="/api")
 
@@ -144,18 +143,34 @@ async def list_tools() -> list[ToolInfoJson]:
 
 
 @router.get("/list_chat_sessions")
-async def list_chat_sessions(canvas_id: str = None):
-    return await db_service.list_sessions(canvas_id)
+async def list_chat_sessions(
+    canvas_id: str = None, user_id: str = Depends(get_current_user_id)
+):
+    return await db_service.list_sessions(canvas_id, user_id=user_id)
 
 
 @router.get("/chat_session/{session_id}")
-async def get_chat_session(session_id: str):
+async def get_chat_session(
+    session_id: str, user_id: str = Depends(get_current_user_id)
+):
+    if not await db_service.user_owns_session(session_id, user_id):
+        # 新建会话可能尚未写入时，允许空历史（归属会在首条消息创建时绑定画布）
+        owner = await db_service.get_session_owner(session_id)
+        if owner is not None:
+            raise HTTPException(status_code=404, detail="会话不存在或无权访问")
+        return []
     return await db_service.get_chat_history(session_id)
 
 
 @router.post("/chat_session/{session_id}/rename")
-async def rename_chat_session(session_id: str, request: Request):
+async def rename_chat_session(
+    session_id: str,
+    request: Request,
+    user_id: str = Depends(get_current_user_id),
+):
+    if not await db_service.user_owns_session(session_id, user_id):
+        raise HTTPException(status_code=404, detail="会话不存在或无权访问")
     data = await request.json()
-    title = data.get('title')
+    title = data.get("title")
     await db_service.update_session_title(session_id, title)
     return {"session_id": session_id, "title": title}

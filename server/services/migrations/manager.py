@@ -4,10 +4,13 @@ from services.migrations.v1_initial_schema import V1InitialSchema
 from services.migrations.v2_add_canvases import V2AddCanvases
 from services.migrations.v3_add_comfy_workflow import V3AddComfyWorkflow
 from services.migrations.v4_add_session_id_to_canvases import V4AddSessionIdToCanvases
+from services.migrations.v5_add_users import V5AddUsers
+from services.migrations.v6_scope_canvases_by_user import V6ScopeCanvasesByUser
+from services.migrations.v7_add_payment_orders import V7AddPaymentOrders
 from . import Migration
 
 # Database version
-CURRENT_VERSION = 4
+CURRENT_VERSION = 7
 
 ALL_MIGRATIONS = [
     {
@@ -26,6 +29,18 @@ ALL_MIGRATIONS = [
         'version': 4,
         'migration': V4AddSessionIdToCanvases,
     },
+    {
+        'version': 5,
+        'migration': V5AddUsers,
+    },
+    {
+        'version': 6,
+        'migration': V6ScopeCanvasesByUser,
+    },
+    {
+        'version': 7,
+        'migration': V7AddPaymentOrders,
+    },
 ]
 class MigrationManager:
     def get_migrations_to_apply(self, current_version: int, target_version: int) -> List[Type[Migration]]:
@@ -42,9 +57,9 @@ class MigrationManager:
         """应用或回滚迁移以达到目标版本"""
         if from_version < to_version:
             # Apply migrations forward
-            print('🦄 Applying migrations forward', from_version, '->', to_version)
+            print('Applying migrations forward', from_version, '->', to_version)
             migrations_to_apply = self.get_migrations_to_apply(from_version, to_version)
-            print('🦄 Migrations to apply', migrations_to_apply)
+            print('Migrations to apply', migrations_to_apply)
             for migration in migrations_to_apply:
                 migration_class = migration['migration']
                 migration = migration_class()
