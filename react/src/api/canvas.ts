@@ -1,5 +1,6 @@
 import { CanvasData, Message, Session } from '@/types/types'
 import { ToolInfo } from '@/api/model'
+import { authenticatedFetch } from './auth'
 
 export type ListCanvasesResponse = {
   id: string
@@ -11,9 +12,21 @@ export type ListCanvasesResponse = {
   session_id?: string
 }
 
+function errorDetail(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object' && 'detail' in data) {
+    const detail = (data as { detail: unknown }).detail
+    if (typeof detail === 'string') return detail
+  }
+  return fallback
+}
+
 export async function listCanvases(): Promise<ListCanvasesResponse[]> {
-  const response = await fetch('/api/canvas/list')
-  return await response.json()
+  const response = await authenticatedFetch('/api/canvas/list')
+  const data = await response.json().catch(() => ([]))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, 'Failed to load projects'))
+  }
+  return data
 }
 
 export async function createCanvas(data: {
@@ -30,19 +43,26 @@ export async function createCanvas(data: {
 
   system_prompt: string
 }): Promise<{ id: string }> {
-  const response = await fetch('/api/canvas/create', {
+  const response = await authenticatedFetch('/api/canvas/create', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   })
-  return await response.json()
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(errorDetail(result, 'Failed to create project'))
+  }
+  return result
 }
 
 export async function getCanvas(
   id: string
 ): Promise<{ data: CanvasData; name: string; sessions: Session[] }> {
-  const response = await fetch(`/api/canvas/${id}`)
-  return await response.json()
+  const response = await authenticatedFetch(`/api/canvas/${id}`)
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, 'Failed to load project'))
+  }
+  return data
 }
 
 export async function saveCanvas(
@@ -52,26 +72,33 @@ export async function saveCanvas(
     thumbnail: string
   }
 ): Promise<void> {
-  const response = await fetch(`/api/canvas/${id}/save`, {
+  const response = await authenticatedFetch(`/api/canvas/${id}/save`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  return await response.json()
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(errorDetail(data, 'Failed to save project'))
+  }
 }
 
 export async function renameCanvas(id: string, name: string): Promise<void> {
-  const response = await fetch(`/api/canvas/${id}/rename`, {
+  const response = await authenticatedFetch(`/api/canvas/${id}/rename`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   })
-  return await response.json()
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(errorDetail(data, 'Failed to rename project'))
+  }
 }
 
 export async function deleteCanvas(id: string): Promise<void> {
-  const response = await fetch(`/api/canvas/${id}/delete`, {
+  const response = await authenticatedFetch(`/api/canvas/${id}/delete`, {
     method: 'DELETE',
   })
-  return await response.json()
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}))
+    throw new Error(errorDetail(data, 'Failed to delete project'))
+  }
 }

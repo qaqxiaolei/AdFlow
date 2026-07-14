@@ -1,4 +1,4 @@
-import { sendMessages, getChatSessionStatus } from '@/api/chat'
+import { sendMessages, getChatSessionStatus, getChatSession } from '@/api/chat'
 import Blur from '@/components/common/Blur'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { eventBus, TEvents } from '@/lib/event'
@@ -616,8 +616,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         sessionIdRef.current = sessionId
         setPending(false)
         setInitialProgress('')
-        const resp = await fetch('/api/chat_session/' + sessionId)
-        const data = await resp.json()
+        const data = await getChatSession(sessionId)
         const msgs = data?.length ? data : []
         const mergedMsgs = mergeToolCallResult(msgs)
         setMessages(mergedMsgs)

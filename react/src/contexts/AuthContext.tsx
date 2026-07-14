@@ -1,11 +1,15 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AuthStatus, getAuthStatus } from '../api/auth'
+import { AuthDialog } from '@/components/auth/AuthDialog'
 
 interface AuthContextType {
   authStatus: AuthStatus
   isLoading: boolean
   refreshAuth: () => Promise<void>
+  showAuthDialog: boolean
+  openAuthDialog: () => void
+  setShowAuthDialog: (open: boolean) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -16,13 +20,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     is_logged_in: false,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [showAuthDialog, setShowAuthDialog] = useState(false)
+
+  const openAuthDialog = useCallback(() => {
+    setShowAuthDialog(true)
+  }, [])
 
   const refreshAuth = async () => {
     try {
       setIsLoading(true)
       const status = await getAuthStatus()
 
-      // Check if token expired based on the status returned by getAuthStatus
       if (status.tokenExpired) {
         toast.error('登录状态已过期，请重新登录', {
           duration: 5000,
@@ -42,8 +50,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ authStatus, isLoading, refreshAuth }}>
+    <AuthContext.Provider
+      value={{
+        authStatus,
+        isLoading,
+        refreshAuth,
+        showAuthDialog,
+        openAuthDialog,
+        setShowAuthDialog,
+      }}
+    >
       {children}
+      <AuthDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
     </AuthContext.Provider>
   )
 }

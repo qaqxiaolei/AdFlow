@@ -1,220 +1,220 @@
-import { BASE_API_URL } from '../constants'
 import i18n from '../i18n'
 
 export interface AuthStatus {
-    status: 'logged_out' | 'pending' | 'logged_in'
-    is_logged_in: boolean
-    user_info?: UserInfo
-    tokenExpired?: boolean
+  status: 'logged_out' | 'pending' | 'logged_in'
+  is_logged_in: boolean
+  user_info?: UserInfo
+  tokenExpired?: boolean
 }
 
 export interface UserInfo {
-    id: string
-    username: string
-    email: string
-    image_url?: string
-    provider?: string
-    created_at?: string
-    updated_at?: string
+  id: string
+  username: string
+  phone?: string
+  email?: string
+  image_url?: string
+  provider?: string
+  credits?: number
+  created_at?: string
+  updated_at?: string
 }
 
-export interface DeviceAuthResponse {
-    status: string
-    code: string
-    expires_at: string
-    message: string
+export interface AuthResult {
+  status: string
+  token: string
+  user_info: UserInfo
+  message?: string
 }
 
-export interface DeviceAuthPollResponse {
-    status: 'pending' | 'authorized' | 'expired' | 'error'
-    message?: string
-    token?: string
-    user_info?: UserInfo
+function errorDetail(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object' && 'detail' in data) {
+    const detail = (data as { detail: unknown }).detail
+    if (typeof detail === 'string') return detail
+    if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg)
+  }
+  return fallback
 }
 
-export interface ApiResponse {
-    status: string
-    message: string
+export async function fetchCaptcha(): Promise<{
+  captcha_id: string
+  image_base64: string
+}> {
+  const response = await fetch('/api/auth/captcha')
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, i18n.t('common:auth.captchaLoadFailed')))
+  }
+  return {
+    captcha_id: data.captcha_id,
+    image_base64: data.image_base64,
+  }
 }
 
-export async function startDeviceAuth(): Promise<DeviceAuthResponse> {
-    const response = await fetch(`${BASE_API_URL}/api/device/auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-    })
-
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    // Open browser for user authentication using Electron API
-    const authUrl = `${BASE_API_URL}/auth/device?code=${data.code}`
-
-    // Check if we're in Electron environment
-    if (window.electronAPI?.openBrowserUrl) {
-        try {
-            await window.electronAPI.openBrowserUrl(authUrl)
-        } catch (error) {
-            console.error('Failed to open browser via Electron:', error)
-            // Fallback to window.open if Electron API fails
-            window.open(authUrl, '_blank')
-        }
-    } else {
-        // Fallback for web environment
-        window.open(authUrl, '_blank')
-    }
-
-    return {
-        status: data.status,
-        code: data.code,
-        expires_at: data.expires_at,
-        message: i18n.t('common:auth.browserLoginMessage'),
-    }
+export async function registerWithPhone(
+  phone: string,
+  password: string,
+  captchaId: string,
+  captchaCode: string
+): Promise<AuthResult> {
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone,
+      password,
+      captcha_id: captchaId,
+      captcha_code: captchaCode,
+    }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, i18n.t('common:auth.registerFailed')))
+  }
+  saveAuthData(data.token, data.user_info)
+  return data
 }
 
-export async function pollDeviceAuth(
-    deviceCode: string
-): Promise<DeviceAuthPollResponse> {
-    const response = await fetch(
-        `${BASE_API_URL}/api/device/poll?code=${deviceCode}`
-    )
-
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    return await response.json()
+export async function loginWithPhone(
+  phone: string,
+  password: string
+): Promise<AuthResult> {
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, password }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, i18n.t('common:auth.loginFailed')))
+  }
+  saveAuthData(data.token, data.user_info)
+  return data
 }
 
 export async function getAuthStatus(): Promise<AuthStatus> {
-    const token = localStorage.getItem('access_token')
-    const userInfo = localStorage.getItem('user_info')
+  const token = localStorage.getItem('access_token')
+  const userInfo = localStorage.getItem('user_info')
 
-    console.log('Getting auth status:', {
-        hasToken: !!token,
-        hasUserInfo: !!userInfo,
-        userInfo: userInfo ? JSON.parse(userInfo) : null,
-    })
-
-    if (token && userInfo) {
-        try {
-            const newToken = await refreshToken(token)
-
-            localStorage.setItem('access_token', newToken)
-            console.log('Token refreshed successfully')
-
-            const authStatus = {
-                status: 'logged_in' as const,
-                is_logged_in: true,
-                user_info: JSON.parse(userInfo),
-            }
-            return authStatus
-        } catch (error) {
-            console.log('Token refresh failed:', error)
-
-            if (error instanceof Error && error.message === 'TOKEN_EXPIRED') {
-                console.log('Token expired, clearing auth data')
-                localStorage.removeItem('access_token')
-                localStorage.removeItem('user_info')
-
-                const loggedOutStatus = {
-                    status: 'logged_out' as const,
-                    is_logged_in: false,
-                    tokenExpired: true,
-                }
-
-                return loggedOutStatus
-            } else {
-                console.log(
-                    'Network error during token refresh, keeping user logged in with existing token'
-                )
-                const authStatus = {
-                    status: 'logged_in' as const,
-                    is_logged_in: true,
-                    user_info: JSON.parse(userInfo),
-                }
-                return authStatus
-            }
+  if (token && userInfo) {
+    try {
+      const refreshed = await refreshToken(token)
+      localStorage.setItem('access_token', refreshed.new_token)
+      if (refreshed.user_info) {
+        localStorage.setItem('user_info', JSON.stringify(refreshed.user_info))
+      }
+      return {
+        status: 'logged_in',
+        is_logged_in: true,
+        user_info: refreshed.user_info || JSON.parse(userInfo),
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'TOKEN_EXPIRED') {
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('user_info')
+        return {
+          status: 'logged_out',
+          is_logged_in: false,
+          tokenExpired: true,
         }
+      }
+      return {
+        status: 'logged_in',
+        is_logged_in: true,
+        user_info: JSON.parse(userInfo),
+      }
     }
+  }
 
-    const loggedOutStatus = {
-        status: 'logged_out' as const,
-        is_logged_in: false,
-    }
-    console.log('Returning logged out status:', loggedOutStatus)
-    return loggedOutStatus
+  return {
+    status: 'logged_out',
+    is_logged_in: false,
+  }
 }
 
 export async function logout(): Promise<{ status: string; message: string }> {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('user_info')
-
-    return {
-        status: 'success',
-        message: i18n.t('common:auth.logoutSuccessMessage'),
-    }
+  localStorage.removeItem('access_token')
+  localStorage.removeItem('user_info')
+  return {
+    status: 'success',
+    message: i18n.t('common:auth.logoutSuccessMessage'),
+  }
 }
 
 export async function getUserProfile(): Promise<UserInfo> {
-    const userInfo = localStorage.getItem('user_info')
-    if (!userInfo) {
-        throw new Error(i18n.t('common:auth.notLoggedIn'))
-    }
-
-    return JSON.parse(userInfo)
+  const userInfo = localStorage.getItem('user_info')
+  if (!userInfo) {
+    throw new Error(i18n.t('common:auth.notLoggedIn'))
+  }
+  return JSON.parse(userInfo)
 }
 
 export function saveAuthData(token: string, userInfo: UserInfo) {
-    localStorage.setItem('access_token', token)
-    localStorage.setItem('user_info', JSON.stringify(userInfo))
+  localStorage.setItem('access_token', token)
+  localStorage.setItem('user_info', JSON.stringify(userInfo))
 }
 
 export function getAccessToken(): string | null {
-    return localStorage.getItem('access_token')
+  return localStorage.getItem('access_token')
 }
 
-// Helper function to make authenticated API calls
 export async function authenticatedFetch(
-    url: string,
-    options: RequestInit = {}
+  url: string,
+  options: RequestInit = {}
 ): Promise<Response> {
-    const token = getAccessToken()
-
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...((options.headers as Record<string, string>) || {}),
-    }
-
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-    }
-
-    return fetch(url, {
-        ...options,
-        headers,
-    })
+  const token = getAccessToken()
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options.headers as Record<string, string>) || {}),
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  return fetch(url, {
+    ...options,
+    headers,
+  })
 }
 
-// 刷新token
-export async function refreshToken(currentToken: string) {
-    const response = await fetch(`${BASE_API_URL}/api/device/refresh-token`, {
-        method: 'GET',
-        headers: {
-            Authorization: `Bearer ${currentToken}`,
-        },
-    })
+export async function refreshToken(currentToken: string): Promise<{
+  new_token: string
+  user_info?: UserInfo
+}> {
+  const response = await fetch('/api/auth/refresh-token', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${currentToken}`,
+    },
+  })
 
-    if (response.status === 200) {
-        const data = await response.json()
-        return data.new_token
-    } else if (response.status === 401) {
-        // Token 真正过期，需要重新登录
-        throw new Error('TOKEN_EXPIRED')
-    } else {
-        // 其他错误（网络错误、服务器错误等），不强制重新登录
-        throw new Error(`NETWORK_ERROR: ${response.status}`)
-    }
+  if (response.status === 200) {
+    return await response.json()
+  }
+  if (response.status === 401) {
+    throw new Error('TOKEN_EXPIRED')
+  }
+  throw new Error(`NETWORK_ERROR: ${response.status}`)
+}
+
+/** Client-side password rules (mirror backend) */
+export function validatePhoneClient(phone: string): string | null {
+  if (!phone.trim()) return i18n.t('common:auth.phoneRequired')
+  if (!/^1[3-9]\d{9}$/.test(phone.trim())) {
+    return i18n.t('common:auth.phoneInvalid')
+  }
+  return null
+}
+
+export function validatePasswordClient(password: string): string | null {
+  if (password.length < 8) return i18n.t('common:auth.passwordTooShort')
+  if (!/[a-z]/.test(password)) return i18n.t('common:auth.passwordNeedLower')
+  if (!/[A-Z]/.test(password)) return i18n.t('common:auth.passwordNeedUpper')
+  if (!/\d/.test(password)) return i18n.t('common:auth.passwordNeedDigit')
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
+    return i18n.t('common:auth.passwordNeedSpecial')
+  }
+  const weak = ['12345678', 'password', 'qwerty12', '11111111', 'abcd1234']
+  if (weak.some((w) => password.toLowerCase().includes(w))) {
+    return i18n.t('common:auth.passwordTooWeak')
+  }
+  return null
 }

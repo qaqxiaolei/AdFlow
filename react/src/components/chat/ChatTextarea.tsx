@@ -32,7 +32,7 @@ import { toast } from 'sonner'
 import ModelSelectorV3 from './ModelSelectorV3'
 import { useAuth } from '@/contexts/AuthContext'
 import { useBalance } from '@/hooks/use-balance'
-import { BASE_API_URL } from '@/constants'
+import { RechargeDialog } from '@/components/auth/RechargeDialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,7 +84,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
 }) => {
   const { t } = useTranslation()
   const isMobile = useIsMobile()
-  const { authStatus } = useAuth()
+  const { authStatus, openAuthDialog } = useAuth()
   const { textModel, selectedTools } = useConfigs()
   const { balance } = useBalance()
   const [prompt, setPrompt] = useState('')
@@ -102,6 +102,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const [quantity, setQuantity] = useState<number>(2)
   const [showQuantitySlider, setShowQuantitySlider] = useState(false)
   const [showAspectRatioPicker, setShowAspectRatioPicker] = useState(false)
+  const [showRechargeDialog, setShowRechargeDialog] = useState(false)
   const quantitySliderRef = useRef<HTMLDivElement>(null)
   const MAX_QUANTITY = 30
 
@@ -117,14 +118,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         size="sm"
         variant="outline"
         className="shrink-0"
-        onClick={() => {
-          const billingUrl = `${BASE_API_URL}/billing`
-          if (window.electronAPI?.openBrowserUrl) {
-            window.electronAPI.openBrowserUrl(billingUrl)
-          } else {
-            window.open(billingUrl, '_blank')
-          }
-        }}
+        onClick={() => setShowRechargeDialog(true)}
       >
         {t('common:auth.recharge')}
       </Button>
@@ -177,16 +171,16 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   // Send Prompt
   const handleSendPrompt = useCallback(async () => {
     if (pending) return
-    // 检查是否使用 Jaaz 服务
-    const isUsingJaaz =
-      textModel?.provider === 'jaaz' ||
-      selectedTools?.some((tool) => tool.provider === 'jaaz')
-    // console.log('👀isUsingJaaz', textModel, selectedTools, isUsingJaaz)
-    // 只有当使用 Jaaz 服务且余额为 0 时才提醒充值
-    if (authStatus.is_logged_in && isUsingJaaz && parseFloat(balance) <= 0) {
+    if (!authStatus.is_logged_in) {
+      openAuthDialog()
+      return
+    }
+    const hasVideoTool = selectedTools?.some((tool) => tool.type === 'video')
+    // 登录用户积分不足时拦截（视频生成会扣积分）
+    if (hasVideoTool && parseFloat(balance) <= 0) {
       toast.error(t('chat:insufficientBalance'), {
         description: <RechargeContent />,
-        duration: 10000, // 10s，给用户更多时间操作
+        duration: 10000,
       })
       return
     }
@@ -267,6 +261,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     selectedAspectRatio,
     quantity,
     authStatus.is_logged_in,
+    openAuthDialog,
     balance,
     RechargeContent,
   ])
@@ -694,6 +689,10 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
           </MobileBottomSheet>
         </>
       )}
+      <RechargeDialog
+        open={showRechargeDialog}
+        onOpenChange={setShowRechargeDialog}
+      />
     </motion.div >
   )
 }

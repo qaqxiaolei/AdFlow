@@ -1,3 +1,4 @@
+import { authenticatedFetch } from '@/api/auth'
 import { Button } from '@/components/ui/button'
 import { ChatSession } from '@/types/types'
 import { XIcon } from 'lucide-react'
@@ -7,25 +8,30 @@ export default function ChatHistory({
   sessionId,
   setSessionId,
   onClose,
+  canvasId,
 }: {
   sessionId: string
   setSessionId: (sessionId: string) => void
   onClose: () => void
+  canvasId?: string
 }) {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
   useEffect(() => {
     const fetchChatSessions = async () => {
-      const sessions = await fetch('/api/list_chat_sessions', {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+      const qs = canvasId
+        ? `?canvas_id=${encodeURIComponent(canvasId)}`
+        : ''
+      const sessions = await authenticatedFetch(`/api/list_chat_sessions${qs}`)
+      if (!sessions.ok) {
+        setChatSessions([])
+        return
+      }
       const data = await sessions.json()
       setChatSessions(data)
     }
 
     fetchChatSessions()
-  }, [])
+  }, [canvasId])
   return (
     <div className="flex flex-col bg-sidebar text-foreground w-[300px]">
       <div className="flex flex-col gap-4 p-3 sticky top-0 right-0 items-end">

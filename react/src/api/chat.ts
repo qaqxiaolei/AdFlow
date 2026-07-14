@@ -1,9 +1,21 @@
 import { Message, Model, PendingType } from '@/types/types'
-import { ModelInfo, ToolInfo } from './model'
+import { ToolInfo } from './model'
+import { authenticatedFetch } from './auth'
+
+function errorDetail(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object' && 'detail' in data) {
+    const detail = (data as { detail: unknown }).detail
+    if (typeof detail === 'string') return detail
+  }
+  return fallback
+}
 
 export const getChatSession = async (sessionId: string) => {
-  const response = await fetch(`/api/chat_session/${sessionId}`)
-  const data = await response.json()
+  const response = await authenticatedFetch(`/api/chat_session/${sessionId}`)
+  const data = await response.json().catch(() => ([]))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, 'Failed to load chat history'))
+  }
   return data as Message[]
 }
 
@@ -15,11 +27,8 @@ export const sendMessages = async (payload: {
   toolList: ToolInfo[]
   systemPrompt: string | null
 }) => {
-  const response = await fetch(`/api/chat`, {
+  const response = await authenticatedFetch(`/api/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       messages: payload.newMessages,
       canvas_id: payload.canvasId,
@@ -29,12 +38,15 @@ export const sendMessages = async (payload: {
       system_prompt: payload.systemPrompt,
     }),
   })
-  const data = await response.json()
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, 'Failed to send message'))
+  }
   return data as Message[]
 }
 
 export const cancelChat = async (sessionId: string) => {
-  const response = await fetch(`/api/cancel/${sessionId}`, {
+  const response = await authenticatedFetch(`/api/cancel/${sessionId}`, {
     method: 'POST',
   })
   return await response.json()
@@ -47,7 +59,7 @@ export type ChatSessionStatus = {
 }
 
 export const getChatSessionStatus = async (sessionId: string) => {
-  const response = await fetch(`/api/chat/status/${sessionId}`)
+  const response = await authenticatedFetch(`/api/chat/status/${sessionId}`)
   if (!response.ok) {
     throw new Error('Failed to fetch chat session status')
   }
@@ -55,10 +67,12 @@ export const getChatSessionStatus = async (sessionId: string) => {
 }
 
 export const renameChatSession = async (sessionId: string, title: string) => {
-  const response = await fetch(`/api/chat_session/${sessionId}/rename`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title }),
-  })
+  const response = await authenticatedFetch(
+    `/api/chat_session/${sessionId}/rename`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    }
+  )
   return await response.json()
 }

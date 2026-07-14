@@ -2,7 +2,7 @@ import CommonDialogContent from '@/components/common/DialogContent'
 import { Button } from '@/components/ui/button'
 import { Dialog } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { useConfigs } from '@/contexts/configs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -55,14 +55,18 @@ const SettingsDialog = () => {
             <SidebarTrigger className="shrink-0" />
           </header>
 
-          <SettingSidebar
-            current={current}
-            setCurrent={setCurrent}
-            onClose={() => setShowSettingsDialog(false)}
-          />
-          <ScrollArea className="flex-1 min-h-0 w-full">
-            {renderContent()}
-          </ScrollArea>
+          <div className="flex flex-1 min-h-0 w-full">
+            <SettingSidebar
+              current={current}
+              setCurrent={setCurrent}
+              onClose={() => setShowSettingsDialog(false)}
+            />
+            <SidebarInset className="min-h-0 overflow-hidden">
+              <ScrollArea className="h-full w-full">
+                {renderContent()}
+              </ScrollArea>
+            </SidebarInset>
+          </div>
         </SidebarProvider>
       </CommonDialogContent>
     </Dialog>
