@@ -102,3 +102,6 @@ cd server && python main.py
 ```
 
 ---
+
+## 算力成本消耗
+每使用一段对话生成两个视频会消耗火山引擎平均值约 ¥11.9（模型：Doubao-Seedance-2.0）
