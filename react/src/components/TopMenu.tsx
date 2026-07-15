@@ -49,7 +49,7 @@ export default function TopMenu({
                     <img src={LOGO_URL} alt="logo" className="size-5 shrink-0" draggable={false} />
                     <motion.div className="flex relative overflow-hidden items-start min-h-7 text-base sm:text-xl font-bold min-w-0">
                         <motion.span className="truncate" layout>
-                            {isHome ? '餐饮商家' : t('canvas:back')}
+                            {isHome ? '蛮闪' : t('canvas:back')}
                         </motion.span>
                     </motion.div>
                 </motion.div>

@@ -56,7 +56,7 @@ export const TOOL_CALL_NAME_MAPPING: { [key in ToolCallFunctionName]: string } =
   finish: 'Finish',
 }
 
-export const LOGO_URL = '/BRT-logo.webp'
+export const LOGO_URL = '/logo.png'
 export const DEFAULT_CANVAS_COVER_URL = LOGO_URL
 
 export const DEFAULT_SYSTEM_PROMPT = `You are a professional art design agent. You can write very professional image prompts to generate aesthetically pleasing images that best fulfilling and matching the user's request.
