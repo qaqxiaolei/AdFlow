@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { downloadVideoFile } from '@/lib/downloadVideo'
 import { cn } from '@/lib/utils'
 import { Download, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -12,8 +12,36 @@ type ChatVideoProps = {
   className?: string
 }
 
+async function enterFullscreenAndPlay(video: HTMLVideoElement) {
+  const anyVideo = video as HTMLVideoElement & {
+    webkitEnterFullscreen?: () => void
+    webkitRequestFullscreen?: () => Promise<void> | void
+  }
+
+  try {
+    if (document.fullscreenElement !== video) {
+      if (typeof video.requestFullscreen === 'function') {
+        await video.requestFullscreen()
+      } else if (typeof anyVideo.webkitRequestFullscreen === 'function') {
+        await anyVideo.webkitRequestFullscreen()
+      } else if (typeof anyVideo.webkitEnterFullscreen === 'function') {
+        anyVideo.webkitEnterFullscreen()
+      }
+    }
+  } catch (error) {
+    console.warn('Fullscreen request failed:', error)
+  }
+
+  try {
+    await video.play()
+  } catch (error) {
+    console.warn('Video play failed:', error)
+  }
+}
+
 export default function ChatVideo({ src, title, className }: ChatVideoProps) {
   const { t } = useTranslation()
+  const videoRef = useRef<HTMLVideoElement>(null)
   const [downloading, setDownloading] = useState(false)
 
   const handleDownload = async (event: React.MouseEvent) => {
@@ -34,6 +62,22 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
     }
   }
 
+  const handleVideoClick = async (event: React.MouseEvent<HTMLVideoElement>) => {
+    // Keep native control clicks (timeline, volume, etc.) working as usual.
+    const video = videoRef.current
+    if (!video) return
+
+    const rect = video.getBoundingClientRect()
+    const controlsReserve = 44
+    const clickedInControls =
+      event.clientY > rect.bottom - controlsReserve
+
+    if (clickedInControls) return
+
+    event.preventDefault()
+    await enterFullscreenAndPlay(video)
+  }
+
   return (
     <span
       className={cn(
@@ -42,11 +86,13 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
       )}
     >
       <video
-        className="w-full max-w-full h-auto rounded-md bg-black"
+        ref={videoRef}
+        className="w-full max-w-full h-auto rounded-md bg-black cursor-pointer"
         controls
         preload="metadata"
         playsInline
         src={src}
+        onClick={handleVideoClick}
         {...(title ? { title } : {})}
       >
         Your browser does not support the video tag.

@@ -13,10 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { logout } from '@/api/auth'
 import { PointsDisplay } from './PointsDisplay'
 import { RechargeDialog } from './RechargeDialog'
+import { LOGO_ICON_URL } from '@/constants'
 
 export function UserMenu() {
   const { authStatus, refreshAuth, openAuthDialog } = useAuth()
@@ -38,17 +38,19 @@ export function UserMenu() {
   if (authStatus.is_logged_in && authStatus.user_info) {
     const { username, phone } = authStatus.user_info
     const display = phone || username || 'U'
-    const initials = display.substring(0, 2).toUpperCase()
 
     return (
       <>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative p-0 h-auto gap-2 px-2">
+            <Button variant="ghost" className="relative h-auto gap-1.5 px-1 py-0">
               <PointsDisplay>
-                <Avatar className="h-6 w-6">
-                  <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                </Avatar>
+                <img
+                  src={LOGO_ICON_URL}
+                  alt="logo"
+                  className="h-7 w-7 object-contain bg-transparent"
+                  draggable={false}
+                />
               </PointsDisplay>
             </Button>
           </DropdownMenuTrigger>

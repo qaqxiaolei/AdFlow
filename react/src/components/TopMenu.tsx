@@ -4,7 +4,7 @@ import { ChevronLeft, MoreVertical, MoonIcon, SettingsIcon, SunIcon } from 'luci
 import { motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from '@tanstack/react-router'
-import { LOGO_URL } from '@/constants'
+import { LOGO_ICON_URL } from '@/constants'
 import { UserMenu } from './auth/UserMenu'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useTheme } from '@/hooks/use-theme'
@@ -33,7 +33,10 @@ export default function TopMenu({
 
     return (
         <motion.div
-            className="sticky top-0 z-20 flex w-full min-h-12 sm:min-h-8 py-2 sm:py-0 bg-background px-3 sm:px-4 justify-between items-center select-none border-b border-border pt-[max(0.5rem,env(safe-area-inset-top))]"
+            className={`sticky top-0 z-20 flex w-full min-h-12 sm:min-h-8 py-2 sm:py-0 px-3 sm:px-4 justify-between items-center select-none pt-[max(0.5rem,env(safe-area-inset-top))] ${isHome
+                ? 'bg-transparent border-b border-transparent'
+                : 'bg-background border-b border-border'
+                }`}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
@@ -46,10 +49,9 @@ export default function TopMenu({
                     {!isHome && (
                         <ChevronLeft className="size-5 shrink-0 group-hover:-translate-x-0.5 transition-transform duration-300" />
                     )}
-                    <img src={LOGO_URL} alt="logo" className="size-5 shrink-0" draggable={false} />
                     <motion.div className="flex relative overflow-hidden items-start min-h-7 text-base sm:text-xl font-bold min-w-0">
                         <motion.span className="truncate" layout>
-                            {isHome ? '蛮闪' : t('canvas:back')}
+                            {isHome ? '蛮闪AI' : t('canvas:back')}
                         </motion.span>
                     </motion.div>
                 </motion.div>
@@ -59,14 +61,19 @@ export default function TopMenu({
                 <div className="hidden md:flex items-center gap-2 mx-2">{middle}</div>
             )}
 
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-0 sm:gap-2 shrink-0">
                 {right}
                 {isMobile ? (
                     <>
                         <UserMenu />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="ghost" aria-label="更多操作">
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    aria-label="更多操作"
+                                    className="h-8 w-8 shrink-0"
+                                >
                                     <MoreVertical className="size-5" />
                                 </Button>
                             </DropdownMenuTrigger>

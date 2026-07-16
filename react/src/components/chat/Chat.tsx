@@ -12,7 +12,7 @@ import {
 } from '@/types/types'
 import { useSearch } from '@tanstack/react-router'
 import { produce } from 'immer'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { nanoid } from 'nanoid'
 import {
     Dispatch,
@@ -41,6 +41,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { useQueryClient } from '@tanstack/react-query'
 import MixedContent, { MixedContentImages, MixedContentText } from './Message/MixedContent'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 
 type ChatInterfaceProps = {
@@ -48,6 +49,48 @@ type ChatInterfaceProps = {
     sessionList: Session[]
     setSessionList: Dispatch<SetStateAction<Session[]>>
     sessionId: string
+}
+
+const VIDEO_MARKDOWN_RE =
+    /!\[[^\]]*(?:video_id:)?[^\]]*\]\(([^)]+\.(?:mp4|webm|mov)(?:\?[^)]*)?|\/api\/file\/vi_[^)]+)\)/gi
+const VIDEO_URL_RE = /(?:\.mp4|\.webm|\.mov)(?:\?|$)|\/api\/file\/vi_/i
+
+function countSessionVideos(messages: Message[]): number {
+    const urls = new Set<string>()
+
+    const collectFromText = (text: string) => {
+        VIDEO_MARKDOWN_RE.lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = VIDEO_MARKDOWN_RE.exec(text)) !== null) {
+            urls.add(match[1])
+        }
+        // Fallback: bare video urls in content
+        if (VIDEO_URL_RE.test(text)) {
+            const bare = text.match(
+                /(?:https?:\/\/[^\s)]+|\/api\/file\/vi_[^\s)]+|\S+\.(?:mp4|webm|mov)(?:\?[^\s)]*)?)/gi
+            )
+            bare?.forEach((url) => {
+                if (VIDEO_URL_RE.test(url)) urls.add(url)
+            })
+        }
+    }
+
+    for (const message of messages) {
+        if (message.role === 'tool') continue
+        const content = message.content
+        if (!content) continue
+        if (typeof content === 'string') {
+            collectFromText(content)
+        } else if (Array.isArray(content)) {
+            for (const part of content) {
+                if (part.type === 'text' && part.text) {
+                    collectFromText(part.text)
+                }
+            }
+        }
+    }
+
+    return urls.size
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -80,8 +123,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         initCanvas ? 'text' : false
     )
     const [initialProgress, setInitialProgress] = useState('')
+    const [inputExpanded, setInputExpanded] = useState(true)
     const mergedToolCallIds = useRef<string[]>([])
     const sessionId = session?.id ?? searchSessionId
+
+    const sessionVideoCount = countSessionVideos(messages)
+    const bothVideosReady = sessionVideoCount >= 2
+    const showChatInput = !bothVideosReady || inputExpanded
+
+    // After both videos finish, collapse the input by default.
+    useEffect(() => {
+        if (bothVideosReady) {
+            setInputExpanded(false)
+        } else {
+            setInputExpanded(true)
+        }
+    }, [bothVideosReady, sessionId])
 
     const sessionIdRef = useRef<string>(session?.id || nanoid())
     const [expandingToolCalls, setExpandingToolCalls] = useState<string[]>([])
@@ -845,14 +902,54 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         )}
                     </ScrollArea>
 
-                    <div className='relative shrink-0 px-3 py-2 sm:p-3 gap-3 bg-background border-t border-border z-50 pb-[max(0.5rem,env(safe-area-inset-bottom))]'>
-                        <ChatTextarea
-                            sessionId={sessionId!}
-                            pending={!!pending}
-                            messages={messages}
-                            onSendMessages={onSendMessages}
-                            onCancelChat={handleCancelChat}
-                        />
+                    <div className='relative shrink-0 px-3 py-2 sm:p-3 z-50 pb-[max(0.5rem,env(safe-area-inset-bottom))]'>
+                        <div className='relative'>
+                            {bothVideosReady && (
+                                <Button
+                                    type='button'
+                                    variant='ghost'
+                                    size='icon'
+                                    className='absolute left-1/2 top-0 z-20 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background shadow-sm touch-manipulation'
+                                    aria-label={showChatInput ? '隐藏输入框' : '显示输入框'}
+                                    onClick={() => setInputExpanded((prev) => !prev)}
+                                >
+                                    {showChatInput ? (
+                                        <ChevronDown className='size-4' />
+                                    ) : (
+                                        <ChevronUp className='size-4' />
+                                    )}
+                                </Button>
+                            )}
+
+                            <AnimatePresence initial={false}>
+                                {showChatInput ? (
+                                    <motion.div
+                                        key='chat-textarea'
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                        className='overflow-hidden'
+                                    >
+                                        <ChatTextarea
+                                            sessionId={sessionId!}
+                                            pending={!!pending}
+                                            messages={messages}
+                                            onSendMessages={onSendMessages}
+                                            onCancelChat={handleCancelChat}
+                                        />
+                                    </motion.div>
+                                ) : (
+                                    bothVideosReady && (
+                                        <div
+                                            key='chat-textarea-collapsed'
+                                            className='h-0 border-t border-border'
+                                            aria-hidden
+                                        />
+                                    )
+                                )}
+                            </AnimatePresence>
+                        </div>
 
                         {/* 魔法生成组件 */}
                         <ChatMagicGenerator
