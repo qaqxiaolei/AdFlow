@@ -17,8 +17,10 @@ export interface WechatOrderResponse {
   credits: number
   price_cny: number
   amount_cents: number
+  trade_type?: 'h5' | 'native' | string
   qr_image: string
   code_url: string
+  h5_url?: string
   mock: boolean
   message?: string
 }
@@ -43,6 +45,8 @@ export async function getBalance(): Promise<BalanceResponse> {
 export async function getRechargePackages(): Promise<{
   packages: RechargePackage[]
   wechat_mock: boolean
+  wechat_ready: boolean
+  wechat_missing: string[]
 }> {
   const response = await authenticatedFetch('/api/billing/packages')
   if (!response.ok) {
@@ -52,15 +56,27 @@ export async function getRechargePackages(): Promise<{
   return {
     packages: data.packages || [],
     wechat_mock: Boolean(data.wechat_mock),
+    wechat_ready: data.wechat_ready !== false,
+    wechat_missing: Array.isArray(data.wechat_missing)
+      ? data.wechat_missing
+      : [],
   }
 }
 
 export async function createWechatRechargeOrder(
-  packageId: string
+  packageId: string,
+  options?: {
+    tradeType?: 'h5' | 'native'
+    redirectUrl?: string
+  }
 ): Promise<WechatOrderResponse> {
   const response = await authenticatedFetch('/api/billing/wechat/create-order', {
     method: 'POST',
-    body: JSON.stringify({ package_id: packageId }),
+    body: JSON.stringify({
+      package_id: packageId,
+      trade_type: options?.tradeType ?? 'h5',
+      redirect_url: options?.redirectUrl,
+    }),
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {

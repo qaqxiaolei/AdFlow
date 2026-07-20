@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import ModelSelectorV3 from './ModelSelectorV3'
 import { useAuth } from '@/contexts/AuthContext'
 import { useBalance } from '@/hooks/use-balance'
+import { useWechatRechargeReturn } from '@/hooks/use-wechat-recharge-return'
 import { RechargeDialog } from '@/components/auth/RechargeDialog'
 import {
   DropdownMenu,
@@ -103,6 +104,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const [showQuantitySlider, setShowQuantitySlider] = useState(false)
   const [showAspectRatioPicker, setShowAspectRatioPicker] = useState(false)
   const [showRechargeDialog, setShowRechargeDialog] = useState(false)
+  useWechatRechargeReturn(authStatus.is_logged_in, setShowRechargeDialog)
   const quantitySliderRef = useRef<HTMLDivElement>(null)
   const MAX_QUANTITY = 30
 

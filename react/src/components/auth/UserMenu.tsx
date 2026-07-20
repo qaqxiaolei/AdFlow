@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRefreshModels } from '@/contexts/configs'
+import { useWechatRechargeReturn } from '@/hooks/use-wechat-recharge-return'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -25,6 +26,9 @@ export function UserMenu() {
   const [showRechargeDialog, setShowRechargeDialog] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+
+  // 从微信支付页回跳后自动打开充值弹窗，完成到账确认
+  useWechatRechargeReturn(authStatus.is_logged_in, setShowRechargeDialog)
 
   const handleLogout = async () => {
     await logout()
