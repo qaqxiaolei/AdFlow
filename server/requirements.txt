@@ -34,3 +34,5 @@ piexif # For EXIF metadata handling in JPEG files
 bcrypt
 PyJWT
 qrcode
+wechatpayv3
+python-dotenv

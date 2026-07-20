@@ -1,6 +1,15 @@
 import os
 import sys
 import io
+
+# 优先加载 server/.env，供微信支付等配置使用
+try:
+    from pathlib import Path
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+except Exception:
+    pass
+
 # Ensure stdout and stderr use utf-8 encoding to prevent emoji logs from crashing python server
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
