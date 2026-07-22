@@ -91,6 +91,29 @@ export async function loginWithPhone(
   return data
 }
 
+export async function resetPasswordWithCaptcha(
+  phone: string,
+  password: string,
+  captchaId: string,
+  captchaCode: string
+): Promise<{ message: string }> {
+  const response = await fetch('/api/auth/forgot-password/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone,
+      password,
+      captcha_id: captchaId,
+      captcha_code: captchaCode,
+    }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(errorDetail(data, i18n.t('common:auth.resetPasswordFailed')))
+  }
+  return data
+}
+
 export async function getAuthStatus(): Promise<AuthStatus> {
   const token = localStorage.getItem('access_token')
   const userInfo = localStorage.getItem('user_info')
@@ -211,10 +234,6 @@ export function validatePasswordClient(password: string): string | null {
   if (!/\d/.test(password)) return i18n.t('common:auth.passwordNeedDigit')
   if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
     return i18n.t('common:auth.passwordNeedSpecial')
-  }
-  const weak = ['12345678', 'password', 'qwerty12', '11111111', 'abcd1234']
-  if (weak.some((w) => password.toLowerCase().includes(w))) {
-    return i18n.t('common:auth.passwordTooWeak')
   }
   return null
 }

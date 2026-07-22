@@ -7,37 +7,6 @@ from datetime import datetime
 
 PHONE_PATTERN = re.compile(r"^1[3-9]\d{9}$")
 
-# 常见弱口令与键盘串
-WEAK_PASSWORDS = {
-    "12345678",
-    "123456789",
-    "1234567890",
-    "password",
-    "password1",
-    "password!",
-    "qwerty12",
-    "qwerty123",
-    "abc12345",
-    "abcd1234",
-    "11111111",
-    "00000000",
-    "88888888",
-    "66666666",
-    "87654321",
-    "iloveyou",
-    "admin123",
-    "letmein1",
-    "welcome1",
-    "passw0rd",
-    "p@ssw0rd",
-    "p@ssword",
-    "a1b2c3d4",
-    "1q2w3e4r",
-    "qwertyui",
-    "asdfghjk",
-    "zxcvbnm1",
-}
-
 SPECIAL_CHARS = re.compile(r'[!@#$%^&*()_+\-=\[\]{};\'":\\|,.<>/?`~]')
 
 
@@ -128,13 +97,6 @@ def validate_password(password: str, phone: str | None = None) -> str | None:
         return "密码须包含数字"
     if not SPECIAL_CHARS.search(password):
         return "密码须包含特殊符号"
-
-    lowered = password.lower()
-    if lowered in WEAK_PASSWORDS or password in WEAK_PASSWORDS:
-        return "密码过于简单，请更换"
-    for weak in WEAK_PASSWORDS:
-        if weak in lowered:
-            return "密码包含常见弱口令，请更换"
 
     if phone and phone in password:
         return "密码不能包含手机号"

@@ -1,4 +1,4 @@
-"""本地手机号登录 / 注册 API。"""
+"""本地手机号登录 / 注册 / 找回密码 API。"""
 
 from __future__ import annotations
 
@@ -36,6 +36,13 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     phone: str
     password: str
+
+
+class ResetPasswordRequest(BaseModel):
+    phone: str
+    password: str
+    captcha_id: str
+    captcha_code: str
 
 
 async def get_current_user_id(
@@ -132,6 +139,32 @@ async def login(body: LoginRequest):
         "token": token,
         "user_info": user_public_dict(user),
         "message": "登录成功",
+    }
+
+
+@router.post("/forgot-password/reset")
+async def forgot_password_reset(body: ResetPasswordRequest):
+    captcha_err = verify_and_consume_captcha(body.captcha_id, body.captcha_code)
+    if captcha_err:
+        raise HTTPException(status_code=400, detail=captcha_err)
+
+    phone_err = validate_phone(body.phone)
+    if phone_err:
+        raise HTTPException(status_code=400, detail=phone_err)
+
+    phone = body.phone.strip()
+    pwd_err = validate_password(body.password, phone)
+    if pwd_err:
+        raise HTTPException(status_code=400, detail=pwd_err)
+
+    user = await db_service.get_user_by_phone(phone)
+    if not user:
+        raise HTTPException(status_code=404, detail="该手机号未注册")
+
+    await db_service.update_user_password(user["id"], hash_password(body.password))
+    return {
+        "status": "success",
+        "message": "密码已重置，请使用新密码登录",
     }
 
 

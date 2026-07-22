@@ -575,6 +575,25 @@ class DatabaseService:
             await db.commit()
             return True
 
+    async def update_user_password(
+        self, user_id: str, password_hash: str
+    ) -> None:
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
+            cursor = await db.execute(
+                """
+                UPDATE users
+                SET password_hash = ?,
+                    updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE id = ?
+                """,
+                (password_hash, user_id),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError("用户不存在")
+            await db.commit()
+
     async def get_user_credits(self, user_id: str) -> float:
         user = await self.get_user_by_id(user_id)
         if not user:

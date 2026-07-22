@@ -6,6 +6,7 @@ import {
   fetchCaptcha,
   loginWithPhone,
   registerWithPhone,
+  resetPasswordWithCaptcha,
   validatePasswordClient,
   validatePhoneClient,
 } from '@/api/auth'
@@ -24,7 +25,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
-type Mode = 'login' | 'register'
+type Mode = 'login' | 'register' | 'forgot'
 
 interface AuthDialogProps {
   open: boolean
@@ -76,7 +77,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   }, [open])
 
   useEffect(() => {
-    if (!open || mode !== 'register') return
+    if (!open || (mode !== 'register' && mode !== 'forgot')) return
     let cancelled = false
     ;(async () => {
       setCaptchaLoading(true)
@@ -101,6 +102,14 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       cancelled = true
     }
   }, [open, mode, t])
+
+  const switchMode = (next: Mode) => {
+    setMode(next)
+    setError('')
+    setPassword('')
+    setConfirmPassword('')
+    setCaptchaCode('')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -152,6 +161,18 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
     setLoading(true)
     try {
+      if (mode === 'forgot') {
+        const result = await resetPasswordWithCaptcha(
+          phone.trim(),
+          password,
+          captchaId,
+          captchaCode.trim()
+        )
+        toast.success(result.message || t('common:auth.resetPasswordSuccess'))
+        switchMode('login')
+        return
+      }
+
       const result = await registerWithPhone(
         phone.trim(),
         password,
@@ -165,7 +186,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
       onOpenChange(false)
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : t('common:auth.registerFailed')
+        err instanceof Error
+          ? err.message
+          : mode === 'forgot'
+            ? t('common:auth.resetPasswordFailed')
+            : t('common:auth.registerFailed')
       )
       void loadCaptcha()
     } finally {
@@ -174,13 +199,19 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   }
 
   const title =
-    mode === 'login' ? t('common:auth.login') : t('common:auth.register')
+    mode === 'login'
+      ? t('common:auth.login')
+      : mode === 'register'
+        ? t('common:auth.register')
+        : t('common:auth.forgotPassword')
   const description =
     mode === 'login'
       ? t('common:auth.loginPhoneDescription')
-      : t('common:auth.registerDescription')
+      : mode === 'register'
+        ? t('common:auth.registerDescription')
+        : t('common:auth.forgotPasswordDescription')
 
-  const form = (
+  const body = (
     <>
       <p
         className={cn(
@@ -191,30 +222,37 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         {description}
       </p>
 
-      <div className={cn('flex gap-2', isMobile ? 'mb-3' : 'mb-2')}>
-        <Button
-          type="button"
-          variant={mode === 'login' ? 'default' : 'outline'}
-          className={cn('flex-1 touch-manipulation', isMobile && 'h-11')}
-          onClick={() => {
-            setMode('login')
-            setError('')
-          }}
-        >
-          {t('common:auth.login')}
-        </Button>
-        <Button
-          type="button"
-          variant={mode === 'register' ? 'default' : 'outline'}
-          className={cn('flex-1 touch-manipulation', isMobile && 'h-11')}
-          onClick={() => {
-            setMode('register')
-            setError('')
-          }}
-        >
-          {t('common:auth.register')}
-        </Button>
-      </div>
+      {mode !== 'forgot' ? (
+        <div className={cn('flex gap-2', isMobile ? 'mb-3' : 'mb-2')}>
+          <Button
+            type="button"
+            variant={mode === 'login' ? 'default' : 'outline'}
+            className={cn('flex-1 touch-manipulation', isMobile && 'h-11')}
+            onClick={() => switchMode('login')}
+          >
+            {t('common:auth.login')}
+          </Button>
+          <Button
+            type="button"
+            variant={mode === 'register' ? 'default' : 'outline'}
+            className={cn('flex-1 touch-manipulation', isMobile && 'h-11')}
+            onClick={() => switchMode('register')}
+          >
+            {t('common:auth.register')}
+          </Button>
+        </div>
+      ) : (
+        <div className={cn(isMobile ? 'mb-3' : 'mb-2')}>
+          <Button
+            type="button"
+            variant="ghost"
+            className={cn('px-0 h-auto', isMobile && 'text-sm')}
+            onClick={() => switchMode('login')}
+          >
+            ← {t('common:auth.backToLogin')}
+          </Button>
+        </div>
+      )}
 
       <form
         onSubmit={handleSubmit}
@@ -235,7 +273,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           />
         </div>
 
-        {mode === 'register' && (
+        {(mode === 'register' || mode === 'forgot') && (
           <div className="space-y-2">
             <Label htmlFor="auth-captcha">{t('common:auth.captcha')}</Label>
             <div className="flex gap-2 items-center">
@@ -284,39 +322,62 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="auth-password">{t('common:auth.password')}</Label>
-          <Input
-            id="auth-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={
-              mode === 'login' ? 'current-password' : 'new-password'
-            }
-            placeholder={
-              mode === 'register'
-                ? t('common:auth.passwordHint')
-                : t('common:auth.password')
-            }
-            className={cn(isMobile && 'h-11 text-base')}
-          />
-        </div>
-
-        {mode === 'register' && (
+        {mode === 'login' && (
           <div className="space-y-2">
-            <Label htmlFor="auth-confirm">
-              {t('common:auth.confirmPassword')}
-            </Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="auth-password">{t('common:auth.password')}</Label>
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => switchMode('forgot')}
+              >
+                {t('common:auth.forgotPassword')}
+              </button>
+            </div>
             <Input
-              id="auth-confirm"
+              id="auth-password"
               type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              placeholder={t('common:auth.password')}
               className={cn(isMobile && 'h-11 text-base')}
             />
           </div>
+        )}
+
+        {(mode === 'register' || mode === 'forgot') && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="auth-new-password">
+                {mode === 'forgot'
+                  ? t('common:auth.newPassword')
+                  : t('common:auth.password')}
+              </Label>
+              <Input
+                id="auth-new-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                placeholder={t('common:auth.passwordHint')}
+                className={cn(isMobile && 'h-11 text-base')}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="auth-confirm">
+                {t('common:auth.confirmPassword')}
+              </Label>
+              <Input
+                id="auth-confirm"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                className={cn(isMobile && 'h-11 text-base')}
+              />
+            </div>
+          </>
         )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -330,7 +391,9 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             ? t('common:auth.submitting')
             : mode === 'login'
               ? t('common:auth.login')
-              : t('common:auth.register')}
+              : mode === 'register'
+                ? t('common:auth.register')
+                : t('common:auth.resetPassword')}
         </Button>
       </form>
     </>
@@ -345,7 +408,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         className="max-h-[90dvh]"
         contentClassName="overflow-y-auto overscroll-contain max-h-[calc(90dvh-3.5rem)]"
       >
-        {form}
+        {body}
       </MobileBottomSheet>
     )
   }
@@ -359,7 +422,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             {description}
           </DialogDescription>
         </DialogHeader>
-        {form}
+        {body}
       </DialogContent>
     </Dialog>
   )
