@@ -57,7 +57,7 @@ const CanvasCard: React.FC<CanvasCardProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: index * 0.1 }}
-            className="border border-primary/20 rounded-xl cursor-pointer hover:border-primary/40 transition-all duration-300 hover:shadow-md hover:bg-primary/5 active:scale-99 relative group"
+            className="border border-white/25 rounded-xl cursor-pointer hover:border-white/40 transition-all duration-300 hover:shadow-md hover:bg-white/10 active:scale-99 relative group bg-white/10 backdrop-blur-[2px]"
         >
             <CanvasDeleteDialog
                 show={showDeleteDialog}
@@ -88,8 +88,12 @@ const CanvasCard: React.FC<CanvasCardProps> = ({
                     />
                 )}
                 <div className="flex flex-col">
-                    <h3 className="text-lg font-bold truncate">{canvas.name}</h3>
-                    <p className="text-sm text-gray-500">{formatDate(canvas.created_at)}</p>
+                    <h3 className="text-lg font-bold truncate text-white">
+                        {canvas.name}
+                    </h3>
+                    <p className="text-sm text-white/70">
+                        {formatDate(canvas.created_at)}
+                    </p>
                 </div>
             </div>
         </motion.div>

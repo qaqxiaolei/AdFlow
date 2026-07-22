@@ -80,33 +80,17 @@ def _is_sequential_or_repeated(password: str) -> bool:
 def validate_password(password: str, phone: str | None = None) -> str | None:
     """
     校验密码强度。
-    规则：8 位以上，含大小写字母、数字、特殊符号；拦截弱密码/生日/序列等。
+    规则：至少 6 位，须同时包含字母和数字。
     失败返回错误信息，成功返回 None。
     """
     if not password or not isinstance(password, str):
         return "请输入密码"
-    if len(password) < 8:
-        return "密码至少 8 位"
+    if len(password) < 6:
+        return "密码至少 6 位"
     if len(password) > 64:
         return "密码过长"
-    if not re.search(r"[a-z]", password):
-        return "密码须包含小写字母"
-    if not re.search(r"[A-Z]", password):
-        return "密码须包含大写字母"
+    if not re.search(r"[A-Za-z]", password):
+        return "密码须包含字母"
     if not re.search(r"\d", password):
         return "密码须包含数字"
-    if not SPECIAL_CHARS.search(password):
-        return "密码须包含特殊符号"
-
-    if phone and phone in password:
-        return "密码不能包含手机号"
-    if phone and phone[-4:] in password and len(phone) == 11:
-        # still allow if incidental; only block if last 4 + more phone digits
-        if phone[-6:] in password:
-            return "密码不能包含手机号片段"
-
-    # if _looks_like_birthday(password):
-    #     return "密码不能使用生日等日期组合"
-    # if _is_sequential_or_repeated(password):
-    #     return "密码不能使用连续或重复字符"
     return None

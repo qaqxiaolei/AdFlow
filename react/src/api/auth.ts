@@ -228,12 +228,8 @@ export function validatePhoneClient(phone: string): string | null {
 }
 
 export function validatePasswordClient(password: string): string | null {
-  if (password.length < 8) return i18n.t('common:auth.passwordTooShort')
-  if (!/[a-z]/.test(password)) return i18n.t('common:auth.passwordNeedLower')
-  if (!/[A-Z]/.test(password)) return i18n.t('common:auth.passwordNeedUpper')
+  if (password.length < 6) return i18n.t('common:auth.passwordTooShort')
+  if (!/[A-Za-z]/.test(password)) return i18n.t('common:auth.passwordNeedLetter')
   if (!/\d/.test(password)) return i18n.t('common:auth.passwordNeedDigit')
-  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(password)) {
-    return i18n.t('common:auth.passwordNeedSpecial')
-  }
   return null
 }

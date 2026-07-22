@@ -19,6 +19,10 @@ const BACKGROUND_VIDEOS = [
   '/backgroudVideo3.mp4',
 ] as const
 
+/** 全屏纵向渐变：上浅下深（fixed 铺满视口，不随内容切断） */
+const HOME_GRADIENT =
+  'linear-gradient(180deg, #c5e85a 0%, #8fcf45 35%, #4db348 70%, #2a9340 100%)'
+
 export const Route = createFileRoute('/')({
   component: Home,
 })
@@ -28,8 +32,9 @@ function Home() {
   const { t } = useTranslation()
   const { setInitCanvas } = useConfigs()
   const [activeVideo, setActiveVideo] = useState(0)
+  /** 仅当视频真正开始播放时才显示，避免微信露出大播放按钮 */
+  const [playingVisible, setPlayingVisible] = useState(false)
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
-  // useMutation 是 @tanstack/react-query 提供的异步提交接口专用钩子，专门处理「新增 / 修改 / 删除」这类会改变后端数据的请求（区别于 useQuery 查数据）
   const { mutate: createCanvasMutation, isPending } = useMutation({
     mutationFn: createCanvas,
     onSuccess: (data, variables) => {
@@ -49,65 +54,132 @@ function Home() {
     },
   })
 
+  const prepareVideo = (video: HTMLVideoElement) => {
+    video.muted = true
+    video.defaultMuted = true
+    video.playsInline = true
+    video.setAttribute('muted', '')
+    video.setAttribute('playsinline', '')
+    video.setAttribute('webkit-playsinline', 'true')
+    video.setAttribute('x5-playsinline', 'true')
+    video.setAttribute('x5-video-player-type', 'h5')
+    video.setAttribute('x5-video-player-fullscreen', 'false')
+  }
+
+  const tryPlay = (video: HTMLVideoElement) => {
+    prepareVideo(video)
+    const playPromise = video.play()
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise
+        .then(() => setPlayingVisible(true))
+        .catch(() => setPlayingVisible(false))
+    }
+  }
+
   useEffect(() => {
     videoRefs.current.forEach((video, index) => {
       if (!video) return
+      prepareVideo(video)
       if (index === activeVideo) {
-        void video.play().catch(() => {})
+        tryPlay(video)
       } else {
         video.pause()
-        video.currentTime = 0
+        try {
+          video.currentTime = 0
+        } catch {
+          // ignore
+        }
       }
     })
   }, [activeVideo])
 
+  useEffect(() => {
+    const resume = () => {
+      const video = videoRefs.current[activeVideo]
+      if (video && video.paused) tryPlay(video)
+    }
+    document.addEventListener('touchstart', resume, { once: true, passive: true })
+    document.addEventListener('click', resume, { once: true })
+    return () => {
+      document.removeEventListener('touchstart', resume)
+      document.removeEventListener('click', resume)
+    }
+  }, [activeVideo])
+
   return (
-    <div className='flex flex-col h-dvh min-h-0 overflow-hidden'>
-      <ScrollArea className='h-full'>
-        <div className='relative'>
-          <div className='absolute inset-0 overflow-hidden pointer-events-none' aria-hidden>
+    <div className="relative flex flex-col h-dvh min-h-0 overflow-hidden bg-background">
+      {/* 全屏固定渐变：70% 不透明度，避免过深 */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 opacity-70"
+        style={{ background: HOME_GRADIENT }}
+        aria-hidden
+      />
+
+      <ScrollArea className="relative z-10 h-full bg-transparent [&_[data-slot=scroll-area-viewport]]:bg-transparent">
+        {/* 上方：仅视频（渐变在更底层，不裁切） */}
+        <div className="relative overflow-hidden">
+          <div
+            className="absolute inset-0 pointer-events-none home-hero-video-mask"
+            aria-hidden
+          >
             {BACKGROUND_VIDEOS.map((src, index) => (
               <video
                 key={src}
                 ref={(el) => {
                   videoRefs.current[index] = el
                 }}
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
-                  index === activeVideo ? 'opacity-100' : 'opacity-0'
-                }`}
+                className={`home-bg-video absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${index === activeVideo && playingVisible
+                  ? 'opacity-75'
+                  : 'opacity-0'
+                  }`}
                 src={src}
-                autoPlay={index === 0}
                 muted
+                autoPlay
                 playsInline
+                preload="metadata"
+                controls={false}
+                disablePictureInPicture
+                disableRemotePlayback
+                onPlaying={() => {
+                  if (index === activeVideo) setPlayingVisible(true)
+                }}
+                onError={() => {
+                  if (index === activeVideo) setPlayingVisible(false)
+                }}
                 onEnded={() => {
-                  setActiveVideo((current) => (current + 1) % BACKGROUND_VIDEOS.length)
+                  setPlayingVisible(false)
+                  setActiveVideo(
+                    (current) => (current + 1) % BACKGROUND_VIDEOS.length
+                  )
                 }}
               />
             ))}
-            <div className='absolute inset-0 bg-background/40' />
-            <div className='absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent' />
           </div>
 
           <TopMenu />
 
-          <div className='relative z-10 flex flex-col items-center justify-center h-fit min-h-[50vh] sm:min-h-[calc(100vh-460px)] pt-8 sm:pt-[60px] px-4 w-full'>
+          <div className="relative z-10 flex flex-col items-center justify-center h-fit min-h-[42vh] sm:min-h-[calc(100vh-420px)] pt-8 sm:pt-[60px] px-4 w-full pb-8">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h1 className='text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 mt-4 sm:mt-8 text-center'>{t('home:title')}</h1>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 mt-4 sm:mt-8 text-center text-white drop-shadow-sm">
+                {t('home:title')}
+              </h1>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <p className='text-base sm:text-xl text-muted-foreground mb-6 sm:mb-8 text-center px-2'>{t('home:subtitle')}</p>
+              <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8 text-center px-2">
+                {t('home:subtitle')}
+              </p>
             </motion.div>
 
             <ChatTextarea
-              className='w-full max-w-xl'
+              className="w-full max-w-xl"
               messages={[]}
               onSendMessages={(messages, configs) => {
                 createCanvasMutation({
@@ -117,7 +189,9 @@ function Home() {
                   session_id: nanoid(),
                   text_model: configs.textModel,
                   tool_list: configs.toolList,
-                  system_prompt: localStorage.getItem('system_prompt') || DEFAULT_SYSTEM_PROMPT,
+                  system_prompt:
+                    localStorage.getItem('system_prompt') ||
+                    DEFAULT_SYSTEM_PROMPT,
                 })
               }}
               pending={isPending}
@@ -125,7 +199,10 @@ function Home() {
           </div>
         </div>
 
-        <CanvasList />
+        {/* 下方：最近项目（透明，透出同一层全屏渐变） */}
+        <div className="relative z-10 bg-transparent">
+          <CanvasList />
+        </div>
       </ScrollArea>
     </div>
   )

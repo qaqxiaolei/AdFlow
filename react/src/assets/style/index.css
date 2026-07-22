@@ -186,3 +186,39 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
+
+/* 首页背景视频：隐藏微信/iOS 默认大播放按钮与控件 */
+.home-bg-video {
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-appearance: none;
+}
+.home-bg-video::-webkit-media-controls {
+  display: none !important;
+  -webkit-appearance: none;
+}
+.home-bg-video::-webkit-media-controls-enclosure {
+  display: none !important;
+}
+.home-bg-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+}
+.home-bg-video::-webkit-media-controls-overlay-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 视频底部淡出，与全屏渐变自然衔接，避免硬切边 */
+.home-hero-video-mask {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 72%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+}
+
