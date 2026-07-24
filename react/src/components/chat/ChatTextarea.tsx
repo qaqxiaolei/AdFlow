@@ -48,6 +48,8 @@ type ChatTextareaProps = {
   className?: string
   messages: Message[]
   sessionId?: string
+  /** 首页可加大默认高度；画布内保持原自动增高 */
+  autoSize?: boolean | { minRows?: number; maxRows?: number }
   onSendMessages: (
     data: Message[],
     configs: {
@@ -80,6 +82,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   className,
   messages,
   sessionId,
+  autoSize = true,
   onSendMessages,
   onCancelChat,
 }) => {
@@ -518,7 +521,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         className="w-full h-full border-none outline-none resize-none"
         placeholder={t('chat:textarea.placeholder')}
         value={prompt}
-        autoSize
+        autoSize={autoSize}
         onChange={(e) => setPrompt(e.target.value)}
         onCompositionStart={() => setIsComposing(true)}
         onCompositionEnd={(e) => {

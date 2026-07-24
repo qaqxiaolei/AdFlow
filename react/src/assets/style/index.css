@@ -222,3 +222,26 @@ body {
   mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
 }
 
+/* 最近项目区吉祥物水印：浅色提高可见度，边缘柔化，不抢内容 */
+.home-projects-mascot {
+  opacity: 0.42;
+  filter: contrast(1.12) saturate(1.08);
+  -webkit-mask-image: radial-gradient(
+    ellipse 68% 72% at 50% 48%,
+    #000 42%,
+    transparent 80%
+  );
+  mask-image: radial-gradient(
+    ellipse 68% 72% at 50% 48%,
+    #000 42%,
+    transparent 80%
+  );
+}
+
+.dark .home-projects-mascot {
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+

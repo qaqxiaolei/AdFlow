@@ -47,7 +47,7 @@ const CanvasList: React.FC = () => {
     <div className="flex flex-col px-4 sm:px-6 lg:px-10 mt-6 sm:mt-10 gap-4 select-none max-w-[1200px] mx-auto w-full">
       {recentCanvases.length > 0 && (
         <motion.span
-          className="text-2xl font-bold text-white drop-shadow-sm"
+          className="text-2xl font-bold"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}

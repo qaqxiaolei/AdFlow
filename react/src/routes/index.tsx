@@ -19,10 +19,6 @@ const BACKGROUND_VIDEOS = [
   '/backgroudVideo3.mp4',
 ] as const
 
-/** 全屏纵向渐变：上浅下深（fixed 铺满视口，不随内容切断） */
-const HOME_GRADIENT =
-  'linear-gradient(180deg, #c5e85a 0%, #8fcf45 35%, #4db348 70%, #2a9340 100%)'
-
 export const Route = createFileRoute('/')({
   component: Home,
 })
@@ -108,18 +104,11 @@ function Home() {
 
   return (
     <div className="relative flex flex-col h-dvh min-h-0 overflow-hidden bg-background">
-      {/* 全屏固定渐变：70% 不透明度，避免过深 */}
-      <div
-        className="pointer-events-none fixed inset-0 z-0 opacity-70"
-        style={{ background: HOME_GRADIENT }}
-        aria-hidden
-      />
-
-      <ScrollArea className="relative z-10 h-full bg-transparent [&_[data-slot=scroll-area-viewport]]:bg-transparent">
-        {/* 上方：仅视频（渐变在更底层，不裁切） */}
-        <div className="relative overflow-hidden">
+      <ScrollArea className="relative z-10 h-full">
+        {/* 上方：视频背景（overflow 仅限制视频层，输入框可向下叠到黑区） */}
+        <div className="relative">
           <div
-            className="absolute inset-0 pointer-events-none home-hero-video-mask"
+            className="absolute inset-0 overflow-hidden pointer-events-none home-hero-video-mask"
             aria-hidden
           >
             {BACKGROUND_VIDEOS.map((src, index) => (
@@ -158,10 +147,10 @@ function Home() {
 
           <TopMenu />
 
-          <div className="relative z-10 flex flex-col items-center justify-center h-fit min-h-[42vh] sm:min-h-[calc(100vh-420px)] pt-8 sm:pt-[60px] px-4 w-full pb-8">
+          <div className="relative z-20 flex flex-col items-center justify-center h-fit min-h-[42vh] sm:min-h-[calc(100vh-420px)] pt-8 sm:pt-[60px] px-4 w-full pb-8">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 1, y: -36 }}
               transition={{ duration: 0.5 }}
             >
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 mt-4 sm:mt-8 text-center text-white drop-shadow-sm">
@@ -170,7 +159,7 @@ function Home() {
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              animate={{ opacity: 1, y: -36 }}
               transition={{ duration: 0.5 }}
             >
               <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8 text-center px-2">
@@ -179,7 +168,8 @@ function Home() {
             </motion.div>
 
             <ChatTextarea
-              className="w-full max-w-xl"
+              className="w-full max-w-xl -mb-10 translate-y-11 sm:translate-y-12"
+              autoSize={{ minRows: 2, maxRows: 8 }}
               messages={[]}
               onSendMessages={(messages, configs) => {
                 createCanvasMutation({
@@ -199,9 +189,22 @@ function Home() {
           </div>
         </div>
 
-        {/* 下方：最近项目（透明，透出同一层全屏渐变） */}
-        <div className="relative z-10 bg-transparent">
-          <CanvasList />
+        {/* 下方：最近项目 + 吉祥物水印背景（黑底图用 blend/mask 弱化，不抢卡片） */}
+        <div className="relative z-10 min-h-[50vh] sm:min-h-[55vh] overflow-hidden bg-background">
+          <div
+            className="pointer-events-none absolute inset-0 flex items-center justify-center home-projects-mascot"
+            aria-hidden
+          >
+            <img
+              src="/background.png"
+              alt=""
+              className="h-[min(100%,480px)] w-auto max-w-[92%] object-contain select-none"
+              draggable={false}
+            />
+          </div>
+          <div className="relative z-10">
+            <CanvasList />
+          </div>
         </div>
       </ScrollArea>
     </div>
