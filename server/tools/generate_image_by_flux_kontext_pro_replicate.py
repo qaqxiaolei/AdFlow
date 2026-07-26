@@ -2,7 +2,7 @@ from typing import Annotated
 from langchain_core.tools import tool, InjectedToolCallId  # type: ignore
 from langchain_core.runnables import RunnableConfig
 from tools.utils.image_generation_core import generate_image_with_provider
-from tools.generate_image_by_flux_kontext_pro_jaaz import GenerateImageByFluxKontextProInputSchema
+from tools.schemas import GenerateImageByFluxKontextProInputSchema
 
 
 @tool("generate_image_by_flux_kontext_pro_replicate",

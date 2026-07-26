@@ -112,6 +112,84 @@ HOTPOT_NEGATIVE_CONSTRAINTS = [
     "不真实汤底质感",
     "畸形食材形状",
 ]
+MILK_TEA_CULINARY_PRIORITY = (
+    "现代简约风奶茶店场景。"
+    "【重要】全片必须是同一家虚构品牌门店，装修、制服、杯型、杯身logo全程一致，"
+    "禁止中途切换成空店棚拍或另一家店。"
+    "【重要】禁止出现任何真实奶茶品牌及其logo，"
+    "尤其禁止喜茶、Heytea、奈雪、茶百道、蜜雪冰城、一点点、COCO、"
+    "以及喜茶经典侧脸喝饮线稿logo；"
+    "若需品牌元素，仅使用简洁圆形自有logo（如单个英文字母），"
+    "门店招牌可用简短英文店名；菜单/海报/工牌尽量无图案代替文字，禁止乱码。"
+    "【重要】产品为透明塑料杯珍珠奶茶：底部黑珍珠自然错落堆叠（禁止整齐网格排列），"
+    "中间奶茶色泽自然分层，倒茶液体呈自然水流而非丝带状固体，"
+    "顶部芝士奶盖或奶油顶，杯壁有冷凝水；"
+    "禁止蜡质/塑料感饮品、畸形杯体、鬼影叠加logo、漂浮杯盖。"
+    "【重要】封口方式与杯盖必须匹配，全片只选一种且保持一致："
+    "方案A（膜封）：画面出现封口机时，杯口必须是热封薄膜封口，禁止再出现可拆塑料平盖或球盖；"
+    "方案B（手扣盖）：芝士奶盖/奶油高顶产品用手扣球盖或平盖，画面中禁止出现膜封机；"
+    "禁止封口机与塑料杯盖同时出现，禁止高奶盖产品却用膜封压平。"
+    "【重要】尽量少拍握杯手部超特写；优先产品居中、店员半身/侧面出镜，手部虚化或出画；"
+    "若出现手部，必须五指完整、关节清晰、不粘连、不融化、不穿模。"
+)
+
+MILK_TEA_SCENE_CONSTRAINTS = [
+    "0-4秒：手持镜头穿过拥挤门店过道，顾客排队刷手机，吧台清晰可见，高人气忙碌感",
+    "4-9秒：同一灰色制服店员在吧台忙碌制作（倒珍珠/倒茶），封口方式全片统一，背景持续有排队顾客虚化",
+    "9-15秒：珍珠奶茶产品特写推进，浅景深但仍保留虚化人流或第二位店员，禁止切到空旷无人背景",
+    "抖音竖屏探店爆款叙事，全片同一空间连续发生，热闹感不掉档",
+]
+
+MILK_TEA_FOOD_POSITIVE_CONSTRAINTS = [
+    "杯壁自然冷凝水珠",
+    "底部黑珍珠自然错落堆叠",
+    "芝士奶盖层厚实平整",
+    "倒茶水流自然真实",
+    "封口方式与杯盖匹配一致",
+    "奶茶色泽诱人且分层真实",
+    "产品特写时背景仍有虚化人流",
+    "同一门店制服与杯型全程一致",
+]
+
+MILK_TEA_NEGATIVE_CONSTRAINTS = [
+    "喜茶",
+    "Heytea",
+    "HEYTEA",
+    "奈雪",
+    "茶百道",
+    "蜜雪冰城",
+    "一点点",
+    "COCO都可",
+    "真实品牌logo",
+    "侧脸喝饮线稿logo",
+    "乱码文字",
+    "菜单乱码",
+    "海报乱码",
+    "工牌乱码",
+    "鬼影叠加logo",
+    "变形人手",
+    "粘连手指",
+    "多余手指",
+    "融化手部",
+    "手指穿模",
+    "握杯手部超特写",
+    "漂浮杯子",
+    "漂浮杯盖",
+    "丝带状倒茶液体",
+    "珍珠整齐网格排列",
+    "封口机与塑料杯盖同时出现",
+    "膜封机配球盖",
+    "膜封机配平盖",
+    "高奶盖却膜封压平",
+    "封口方式中途切换",
+    "蜡质饮品",
+    "塑料质感奶茶",
+    "畸形杯体",
+    "空旷无人门店",
+    "棚拍空背景",
+    "特写时背景无人",
+    "中途切换门店装修",
+]
 
 POULTRY_POSITIVE_CONSTRAINTS = [
     "标准鸡翅形状",
@@ -159,6 +237,17 @@ def is_hotpot_scene(prompt: str) -> bool:
     return any(keyword in lowered for keyword in keywords)
 
 
+def is_milk_tea_scene(prompt: str) -> bool:
+    lowered = prompt.lower()
+    keywords = (
+        "奶茶", "珍珠奶茶", "波霸", "奶盖", "芝士奶盖", "摇茶", "封口机",
+        "奶茶店", "茶饮店", "手打柠檬茶", "果茶", "芋泥", "椰果",
+        "boba", "bubble tea", "milk tea", "milktea", "brown sugar pearl",
+        "tapioca", "cheese foam", "heytea", "喜茶",
+    )
+    return any(keyword in lowered for keyword in keywords)
+
+
 def build_scene_prompt(
     scene_prompt: str,
     camera_motion: str = "",
@@ -168,17 +257,22 @@ def build_scene_prompt(
     style_tags: list | None = None,
     negative_tags: list | None = None,
     include_hotpot_constraints: bool = False,
+    include_milk_tea_constraints: bool = False,
 ) -> dict:
     layers = []
 
     if include_hotpot_constraints:
         layers.append(HOTPOT_CULINARY_PRIORITY)
+    elif include_milk_tea_constraints:
+        layers.append(MILK_TEA_CULINARY_PRIORITY)
 
     if scene_prompt:
         layers.append(scene_prompt)
 
     if include_hotpot_constraints:
         layers.extend(HOTPOT_SCENE_CONSTRAINTS)
+    elif include_milk_tea_constraints:
+        layers.extend(MILK_TEA_SCENE_CONSTRAINTS)
 
     if scene:
         layers.append(scene)
@@ -194,6 +288,8 @@ def build_scene_prompt(
 
     if include_hotpot_constraints:
         layers.extend(HOTPOT_FOOD_POSITIVE_CONSTRAINTS)
+    elif include_milk_tea_constraints:
+        layers.extend(MILK_TEA_FOOD_POSITIVE_CONSTRAINTS)
     else:
         layers.extend(GENERIC_FOOD_POSITIVE_CONSTRAINTS)
 
@@ -205,6 +301,9 @@ def build_scene_prompt(
     negative_prompt = "，".join(FOOD_NEGATIVE_CONSTRAINTS)
     if include_hotpot_constraints:
         negative_prompt += "，" + "，".join(HOTPOT_NEGATIVE_CONSTRAINTS)
+    elif include_milk_tea_constraints:
+        negative_prompt += "，" + "，".join(MILK_TEA_NEGATIVE_CONSTRAINTS)
+        negative_prompt += "，" + "，".join(NON_HOTPOT_NEGATIVE_CONSTRAINTS)
     else:
         negative_prompt += "，" + "，".join(NON_HOTPOT_NEGATIVE_CONSTRAINTS)
     if negative_tags:
@@ -221,15 +320,30 @@ def build_multi_video_prompts(
     aspect_ratio: str = "9:16",
     has_reference_image: bool = False,
     is_hotpot: bool | None = None,
+    is_milk_tea: bool | None = None,
 ) -> list[dict]:
     prompts = []
     include_hotpot = is_hotpot if is_hotpot is not None else is_hotpot_scene(scene_prompt)
+    include_milk_tea = (
+        False if include_hotpot
+        else (is_milk_tea if is_milk_tea is not None else is_milk_tea_scene(scene_prompt))
+    )
 
     if quantity == 1:
         if include_hotpot:
             camera_motion = "镜头在餐厅场景中自然移动"
             lighting = "温暖电影感灯光，食物高光诱人"
             scene = "真实用餐氛围，顾客自然走动"
+        elif include_milk_tea:
+            camera_motion = (
+                "手持镜头穿过排队过道，再跟拍店员半身制作，最后推进产品特写；"
+                "产品特写时手部尽量虚化或出画，避免握杯手指占满画面"
+            )
+            lighting = "明亮干净的店内灯光与自然窗光，杯身与奶盖高光诱人"
+            scene = (
+                "同一奶茶门店全程高人气；开篇排队清晰，中段吧台忙碌，"
+                "结尾产品特写背景仍保留虚化顾客或店员，热闹感不掉档"
+            )
         else:
             camera_motion = "镜头在门店场景中自然移动"
             lighting = "温暖电影感灯光，产品高光诱人"
@@ -241,6 +355,7 @@ def build_multi_video_prompts(
             scene=scene,
             has_reference_image=has_reference_image,
             include_hotpot_constraints=include_hotpot,
+            include_milk_tea_constraints=include_milk_tea,
         )
         result["ratio"] = aspect_ratio
         prompts.append(result)
@@ -261,6 +376,34 @@ def build_multi_video_prompts(
                     "camera_motion": "平滑电影级轨道镜头，数字人服务员端锅走向餐桌",
                     "lighting": "棚拍三点布光，精致商业调色，浅景深",
                     "scene": "虚拟制片火锅店场景，超写实数字人员工和顾客，高端广告质感",
+                    "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
+                    "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
+                },
+            ]
+        elif include_milk_tea:
+            styles = [
+                {
+                    "name": "写实风格",
+                    "camera_motion": (
+                        "手持镜头穿过排队过道，跟拍店员半身制作，再推进珍珠奶茶特写；"
+                        "特写时手部虚化，避免手指占满画面"
+                    ),
+                    "lighting": "明亮店内灯光与自然窗光，纪录片写实感",
+                    "scene": (
+                        "热闹真实的奶茶店，同一装修与制服，全程可见排队人流；"
+                        "产品特写背景仍有虚化顾客，热闹感不掉档"
+                    ),
+                    "style_tags": REALISTIC_STYLE_TAGS,
+                    "negative_tags": REALISTIC_NEGATIVE_TAGS,
+                },
+                {
+                    "name": "仿真人风格",
+                    "camera_motion": (
+                        "平滑电影级轨道镜头，数字人店员半身递出珍珠奶茶；"
+                        "结尾产品特写手部出画或虚化"
+                    ),
+                    "lighting": "棚拍三点布光，精致商业调色，浅景深",
+                    "scene": "虚拟制片奶茶店场景，超写实数字人员工和排队顾客，高端广告质感",
                     "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
                     "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
                 },
@@ -296,6 +439,7 @@ def build_multi_video_prompts(
                 style_tags=style["style_tags"],
                 negative_tags=style["negative_tags"],
                 include_hotpot_constraints=include_hotpot,
+                include_milk_tea_constraints=include_milk_tea,
             )
             result["ratio"] = aspect_ratio
             result["style_name"] = style["name"]
@@ -316,6 +460,7 @@ def enhance_video_prompt(
 
     combined_context = f"{scene_prompt} {user_context}".strip()
     include_hotpot = is_hotpot_scene(combined_context)
+    include_milk_tea = (not include_hotpot) and is_milk_tea_scene(combined_context)
 
     if quantity > 1:
         prompts = build_multi_video_prompts(
@@ -324,6 +469,7 @@ def enhance_video_prompt(
             aspect_ratio=aspect_ratio,
             has_reference_image=has_reference_image,
             is_hotpot=include_hotpot,
+            is_milk_tea=include_milk_tea,
         )
         for item in prompts:
             item["prompt"] = append_aspect_ratio_hint(item["prompt"], aspect_ratio)
@@ -336,6 +482,16 @@ def enhance_video_prompt(
         camera_motion = "镜头在餐厅场景中自然移动"
         lighting = "温暖电影感灯光，食物高光诱人"
         scene = "真实用餐氛围，顾客自然走动"
+    elif include_milk_tea:
+        camera_motion = (
+            "手持镜头穿过排队过道，再跟拍店员半身制作，最后推进产品特写；"
+            "产品特写时手部尽量虚化或出画，避免握杯手指占满画面"
+        )
+        lighting = "明亮干净的店内灯光与自然窗光，杯身与奶盖高光诱人"
+        scene = (
+            "同一奶茶门店全程高人气；开篇排队清晰，中段吧台忙碌，"
+            "结尾产品特写背景仍保留虚化顾客或店员，热闹感不掉档"
+        )
     else:
         camera_motion = "镜头在门店场景中自然移动"
         lighting = "温暖电影感灯光，产品高光诱人"
@@ -348,6 +504,7 @@ def enhance_video_prompt(
         scene=scene,
         has_reference_image=has_reference_image,
         include_hotpot_constraints=include_hotpot,
+        include_milk_tea_constraints=include_milk_tea,
     )
     result["prompt"] = append_aspect_ratio_hint(result["prompt"], aspect_ratio)
     result["ratio"] = aspect_ratio

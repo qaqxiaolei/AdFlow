@@ -9,7 +9,7 @@ from tools.video_generation.video_generation_core import generate_video_with_pro
 from tools.video_generation.video_prompt_utils import enhance_video_prompt
 from tools.video_generation.video_canvas_utils import send_tool_call_progress
 from tools.agnes_model_config import VOLCES_VIDEO_MODEL_DEFAULT
-from tools.video_providers.agnes_provider import VIDEO_CREATE_RATE_LIMIT_SECONDS
+from tools.video_generation.constants import VIDEO_CREATE_RATE_LIMIT_SECONDS
 from .utils.image_utils import process_input_image
 
 VALID_ASPECT_RATIOS = {"1:1", "16:9", "9:16", "4:3", "21:9", "3:4"}
@@ -182,12 +182,12 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
         description="必填。视频生成提示词，描述希望在视频中看到的画面内容，可使用中文或英文。"
     )
     resolution: str = Field(
-        default="480p",
-        description="可选。视频分辨率。快速生成请使用 480p。可选值：480p、1080p。"
+        default="1080p",
+        description="可选。视频分辨率。默认 1080p 以提升画质；生成 2 条视频求速度时可用 480p。可选值：480p、1080p。"
     )
     duration: int = Field(
-        default=10,
-        description="可选。视频时长（秒）。快速生成建议使用 10 秒。可选值：5、10、15，最长不超过 15 秒。"
+        default=15,
+        description="可选。视频时长（秒）。默认 15 秒。可选值：5、10、15，最长不超过 15 秒。"
     )
     aspect_ratio: str = Field(
         default="9:16",
@@ -209,14 +209,14 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
 
 
 @tool("generate_video_by_agnes",
-      description="使用 Seedance 2.0 视频模型（火山方舟）生成视频。提示词需包含详细的视觉场景描述（可用中文）。用户消息中的 <aspect_ratio> 和 <quantity> 标签必须原样传入对应参数。",
+      description="使用 Seedance 2.0 视频模型（火山方舟/Volces）生成视频。工具名含 agnes 为历史兼容；实际调用 volces provider。提示词需包含详细的视觉场景描述（可用中文）。用户消息中的 <aspect_ratio> 和 <quantity> 标签必须原样传入对应参数。",
       args_schema=GenerateVideoByAgnesInputSchema)
 async def generate_video_by_agnes(
     prompt: str,
     config: RunnableConfig,
     tool_call_id: Annotated[str, InjectedToolCallId],
-    resolution: str = "480p",
-    duration: int = 10,
+    resolution: str = "1080p",
+    duration: int = 15,
     aspect_ratio: str = "9:16",
     ratio: str = "9:16",
     input_images: Any = None,

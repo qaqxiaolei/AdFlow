@@ -170,3 +170,47 @@ async def process_input_image(input_image: str | None) -> str | None:
     except Exception as e:
         print(f"Error processing image {input_image}: {e}")
         return None
+
+
+def get_image_base64(image_name: str) -> str:
+    """Load local image and return a data-URL base64 string.
+
+    Volces/Doubao video models only accept aspect ratios roughly in 0.4–2.5;
+    out-of-range images are resized before encoding.
+    """
+    from mimetypes import guess_type
+
+    image_path = os.path.join(FILES_DIR, f"{image_name}")
+    image = Image.open(image_path)
+
+    width, height = image.size
+    ratio = width / height
+    if ratio > 2.5 or ratio < 0.4:
+        if ratio < 1:
+            new_height = int(width * 2.4)
+            new_width = width
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        elif ratio > 1:
+            new_width = int(height * 2.4)
+            new_height = height
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        else:
+            new_width, new_height = image.size
+    else:
+        new_width, new_height = image.size
+
+    scale_factor: float = float((float(1048576) / float(new_width * new_height)) ** 0.5)
+    preview_image_width = int(new_width * scale_factor)
+    preview_image_height = int(new_height * scale_factor)
+
+    img = image.resize(
+        (preview_image_width, preview_image_height), Image.Resampling.LANCZOS
+    )
+    img_byte_arr = BytesIO()
+    img.save(img_byte_arr, format="PNG")
+
+    b64 = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
+    mime_type, _ = guess_type(image_path)
+    if not mime_type:
+        mime_type = "image/png"
+    return f"data:{mime_type};base64,{b64}"

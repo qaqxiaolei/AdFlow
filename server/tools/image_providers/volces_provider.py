@@ -8,7 +8,7 @@ from openai.types import Image
 from openai import OpenAI, OpenAIError
 from .image_base_provider import ImageProviderBase
 from ..utils.image_utils import get_image_info_and_save, generate_image_id
-from tools.video_generation_utils import get_image_base64
+from tools.utils.image_utils import get_image_base64
 from services.config_service import FILES_DIR, config_service
 from utils.http_client import HttpClient
 

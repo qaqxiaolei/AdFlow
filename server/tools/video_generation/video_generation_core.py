@@ -10,8 +10,9 @@ from ..video_providers.video_base_provider import (
     resolve_video_provider,
     VideoProviderBase,
 )
-# 导入所有 provider 以确保自动注册（请勿删除这些 import）
+# 导入 provider 以确保自动注册（请勿删除）
 from ..video_providers.volces_provider import VolcesVideoProvider  # type: ignore
+# Agnes 原生视频 provider 仍注册，供可选回退；主路径 generate_video_by_agnes 使用 volces
 from ..video_providers.agnes_provider import AgnesVideoProvider  # type: ignore
 from .video_canvas_utils import (
     send_video_start_notification,
@@ -19,6 +20,7 @@ from .video_canvas_utils import (
     send_tool_call_progress,
     process_video_result,
 )
+from .constants import VIDEO_CREATE_RATE_LIMIT_SECONDS  # noqa: F401 — re-export for callers
 
 async def generate_video_with_provider(
     prompt: str,

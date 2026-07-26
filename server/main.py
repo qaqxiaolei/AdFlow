@@ -130,7 +130,9 @@ app.include_router(root_router.router)
 app.include_router(canvas.router)
 app.include_router(workspace.router)
 app.include_router(image_router.router)
-app.include_router(ssl_test.router)
+# SSL 诊断路由默认关闭；需要时设置环境变量 ENABLE_SSL_TEST=1
+if os.environ.get("ENABLE_SSL_TEST", "").strip() in ("1", "true", "TRUE", "yes"):
+    app.include_router(ssl_test.router)
 app.include_router(chat_router.router)
 app.include_router(tool_confirmation.router)
 app.include_router(auth_router.router)

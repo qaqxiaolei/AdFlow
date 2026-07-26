@@ -2,7 +2,7 @@ from typing import Annotated
 from langchain_core.tools import tool, InjectedToolCallId  # type: ignore
 from langchain_core.runnables import RunnableConfig
 from tools.utils.image_generation_core import generate_image_with_provider
-from tools.generate_image_by_flux_kontext_max_jaaz import GenerateImageByFluxKontextMaxInputSchema
+from tools.schemas import GenerateImageByFluxKontextMaxInputSchema
 
 
 @tool("generate_image_by_flux_kontext_max_replicate",

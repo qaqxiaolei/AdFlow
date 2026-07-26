@@ -27,9 +27,8 @@ from ..agnes_model_config import (
     is_valid_video_model,
 )
 from ..video_generation.video_canvas_utils import send_tool_call_progress
+from ..video_generation.constants import VIDEO_CREATE_RATE_LIMIT_SECONDS
 
-# Agnes 视频接口限流：约 1 次/分钟
-VIDEO_CREATE_RATE_LIMIT_SECONDS = 62
 # 单个视频轮询基础预算（秒），会按视频时长动态增加
 VIDEO_POLL_BUDGET_BASE_SECONDS = 180
 # 任务仍在 in_progress 时，超过预算后额外等待的宽限时间（秒）
