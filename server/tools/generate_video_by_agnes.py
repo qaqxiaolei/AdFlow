@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from langchain_core.tools import tool, InjectedToolCallId
 from langchain_core.runnables import RunnableConfig
 from tools.video_generation.video_generation_core import generate_video_with_provider
-from tools.video_generation.video_prompt_utils import enhance_video_prompt
+from tools.video_generation.video_prompt_utils import enhance_video_prompt_with_agnes
 from tools.video_generation.video_canvas_utils import send_tool_call_progress
 from tools.agnes_model_config import VOLCES_VIDEO_MODEL_DEFAULT
 from tools.video_generation.constants import VIDEO_CREATE_RATE_LIMIT_SECONDS
@@ -250,13 +250,14 @@ async def generate_video_by_agnes(
             raise ValueError(
                 "未能处理任何输入图片。请检查图片是否存在且有效。")
 
-    prompt_result = enhance_video_prompt(
+    prompt_result = await enhance_video_prompt_with_agnes(
         original_prompt=resolved_prompt,
         aspect_ratio=actual_ratio,
-        has_reference_image=has_reference_image,
+        has_reference_image=bool(has_reference_image),
         quantity=resolved_quantity,
         user_context=_get_user_prompt(config),
     )
+    
     print('🎥 [GenerateVideo] 增强后的提示词', prompt_result)
     if prompt_result.get("prompts"):
         first_prompt = prompt_result["prompts"][0].get("prompt", "")

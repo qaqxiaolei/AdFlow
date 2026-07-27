@@ -52,6 +52,7 @@ AGNES_VIDEO_MODEL_DEFAULT: str = AGNES_VIDEO_MODELS[0]
 
 # ==================== 文本模型配置 ====================
 AGNES_TEXT_MODELS: List[str] = [
+    "agnes-2.5-flash",
     "agnes-2.0-flash",
     "agnes-1.0",
 ]
@@ -60,7 +61,7 @@ Agnes 文本生成模型列表（按优先级排序）
 """
 
 AGNES_TEXT_MODEL_DEFAULT: str = AGNES_TEXT_MODELS[0]
-"""默认文本生成模型"""
+"""默认文本生成模型（视频提示词增强等）"""
 
 
 def get_image_models_with_fallback() -> tuple[str, List[str]]:

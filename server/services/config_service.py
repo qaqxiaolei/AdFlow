@@ -29,6 +29,7 @@ AppConfig = Dict[str, ProviderConfig]
 DEFAULT_PROVIDERS_CONFIG: AppConfig = {
     'agnes': {
         'models': {
+            'agnes-2.5-flash': {'type': 'text'},
             'agnes-2.0-flash': {'type': 'text'},
             'agnes-image-2.1-flash': {'type': 'image'},
         },

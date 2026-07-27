@@ -1,3 +1,20 @@
+"""视频提示词拼装：按品类（火锅 / 奶茶 / 通用）组合正向与负向约束；
+也可通过 Agnes 文本模型做 LLM 增强。
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Any
+
+import httpx
+
+from services.config_service import config_service
+from tools.agnes_model_config import AGNES_TEXT_MODEL_DEFAULT, AGNES_TEXT_MODELS
+
+# --- 正向 / 负向约束素材 ---
+
 GENERIC_FOOD_POSITIVE_CONSTRAINTS = [
     "新鲜食材的自然色泽变化",
     "食材比例真实的餐饮摆盘",
@@ -27,6 +44,7 @@ FOOD_NEGATIVE_CONSTRAINTS = [
     "变形的人手",
 ]
 
+# 多视频时的两套风格标签
 REALISTIC_STYLE_TAGS = [
     "纪录片手持拍摄风格",
     "手机实拍真实餐厅",
@@ -61,6 +79,7 @@ DIGITAL_HUMAN_NEGATIVE_TAGS = [
     "抽象食物团块",
 ]
 
+# 火锅：拼在 prompt 最前的硬规则
 HOTPOT_CULINARY_PRIORITY = (
     "正宗四川火锅店场景。"
     "【重要】肉类必须是叠放在白色瓷盘上的薄切雪花肥牛卷，"
@@ -81,6 +100,7 @@ HOTPOT_SCENE_CONSTRAINTS = [
     "抖音风格短视频火锅店叙事",
 ]
 
+# 非火锅场景追加，避免串成火锅
 NON_HOTPOT_NEGATIVE_CONSTRAINTS = [
     "火锅",
     "锅底",
@@ -112,15 +132,17 @@ HOTPOT_NEGATIVE_CONSTRAINTS = [
     "不真实汤底质感",
     "畸形食材形状",
 ]
+
+# 奶茶：虚构品牌、封口一致、少拍坏手
 MILK_TEA_CULINARY_PRIORITY = (
     "现代简约风奶茶店场景。"
     "【重要】全片必须是同一家虚构品牌门店，装修、制服、杯型、杯身logo全程一致，"
     "禁止中途切换成空店棚拍或另一家店。"
     "【重要】禁止出现任何真实奶茶品牌及其logo，"
-    "尤其禁止喜茶、Heytea、奈雪、茶百道、蜜雪冰城、一点点、COCO、"
+    "尤其禁止喜茶、Heytea、奈雪、茶百道、蜜雪冰城、一点点、COCO、瑞幸、星巴克"
     "以及喜茶经典侧脸喝饮线稿logo；"
     "若需品牌元素，仅使用简洁圆形自有logo（如单个英文字母），"
-    "门店招牌可用简短英文店名；菜单/海报/工牌尽量无图案代替文字，禁止乱码。"
+    "门店招牌可用简短英文店名；菜单/海报/工牌尽量用图案代替文字，禁止乱码。"
     "【重要】产品为透明塑料杯珍珠奶茶：底部黑珍珠自然错落堆叠（禁止整齐网格排列），"
     "中间奶茶色泽自然分层，倒茶液体呈自然水流而非丝带状固体，"
     "顶部芝士奶盖或奶油顶，杯壁有冷凝水；"
@@ -131,14 +153,10 @@ MILK_TEA_CULINARY_PRIORITY = (
     "禁止封口机与塑料杯盖同时出现，禁止高奶盖产品却用膜封压平。"
     "【重要】尽量少拍握杯手部超特写；优先产品居中、店员半身/侧面出镜，手部虚化或出画；"
     "若出现手部，必须五指完整、关节清晰、不粘连、不融化、不穿模。"
+    "【重要】禁止出现手指没有触碰到杯子的时候，杯子就自己移动的情况"
+    "【重要】禁止出现一个视频中人物既有真人也有仿真人"
+    "镜头不能晃动太快，并且不能穿帮，例如在一个门店镜头不能从客户直接到店员制作的地方，这样会穿帮"
 )
-
-MILK_TEA_SCENE_CONSTRAINTS = [
-    "0-4秒：手持镜头穿过拥挤门店过道，顾客排队刷手机，吧台清晰可见，高人气忙碌感",
-    "4-9秒：同一灰色制服店员在吧台忙碌制作（倒珍珠/倒茶），封口方式全片统一，背景持续有排队顾客虚化",
-    "9-15秒：珍珠奶茶产品特写推进，浅景深但仍保留虚化人流或第二位店员，禁止切到空旷无人背景",
-    "抖音竖屏探店爆款叙事，全片同一空间连续发生，热闹感不掉档",
-]
 
 MILK_TEA_FOOD_POSITIVE_CONSTRAINTS = [
     "杯壁自然冷凝水珠",
@@ -191,6 +209,7 @@ MILK_TEA_NEGATIVE_CONSTRAINTS = [
     "中途切换门店装修",
 ]
 
+# 预留，主流程暂未注入
 POULTRY_POSITIVE_CONSTRAINTS = [
     "标准鸡翅形状",
     "酥脆自然表皮",
@@ -220,6 +239,7 @@ ASPECT_RATIO_PROMPT_HINTS = {
 
 
 def append_aspect_ratio_hint(prompt: str, aspect_ratio: str) -> str:
+    """追加画幅提示；已存在则不重复。"""
     hint = ASPECT_RATIO_PROMPT_HINTS.get(aspect_ratio)
     if not hint or hint in prompt:
         return prompt
@@ -227,6 +247,7 @@ def append_aspect_ratio_hint(prompt: str, aspect_ratio: str) -> str:
 
 
 def is_hotpot_scene(prompt: str) -> bool:
+    """关键词判定是否火锅场景。"""
     lowered = prompt.lower()
     keywords = (
         "hotpot", "hot pot", "火锅", "锅底", "麻辣", "红油", "鸳鸯锅",
@@ -238,13 +259,15 @@ def is_hotpot_scene(prompt: str) -> bool:
 
 
 def is_milk_tea_scene(prompt: str) -> bool:
+    """关键词判定是否奶茶/茶饮场景。"""
     lowered = prompt.lower()
     keywords = (
         "奶茶", "珍珠奶茶", "波霸", "奶盖", "芝士奶盖", "摇茶", "封口机",
         "奶茶店", "茶饮店", "手打柠檬茶", "果茶", "芋泥", "椰果",
         "boba", "bubble tea", "milk tea", "milktea", "brown sugar pearl",
-        "tapioca", "cheese foam", "heytea", "喜茶",
+        "tapioca", "cheese foam", "heytea", "喜茶", "咖啡", "咖啡馆", "咖啡店", "咖啡师", "手冲", "意式", "拿铁", "美式",
     )
+    # 只要里面任意一个结果为 True，整体返回 True；全部都是 False 才返回 False
     return any(keyword in lowered for keyword in keywords)
 
 
@@ -259,6 +282,12 @@ def build_scene_prompt(
     include_hotpot_constraints: bool = False,
     include_milk_tea_constraints: bool = False,
 ) -> dict:
+    """
+    拼装单条 prompt / negative_prompt。
+
+    正向顺序：品类硬规则 → 用户描述 → 场景约束 → scene/运镜/灯光 → style_tags → 食物正向。
+    火锅与奶茶约束互斥；返回 {"prompt", "negative_prompt"}。
+    """
     layers = []
 
     if include_hotpot_constraints:
@@ -314,6 +343,7 @@ def build_scene_prompt(
         "negative_prompt": negative_prompt,
     }
 
+
 def build_multi_video_prompts(
     scene_prompt: str,
     quantity: int = 1,
@@ -322,6 +352,10 @@ def build_multi_video_prompts(
     is_hotpot: bool | None = None,
     is_milk_tea: bool | None = None,
 ) -> list[dict]:
+    """
+    生成 1～2 条提示词。quantity>=2 时最多两条：写实 + 仿真人。
+    is_hotpot / is_milk_tea 为 None 时自动检测；火锅优先于奶茶。
+    """
     prompts = []
     include_hotpot = is_hotpot if is_hotpot is not None else is_hotpot_scene(scene_prompt)
     include_milk_tea = (
@@ -335,10 +369,7 @@ def build_multi_video_prompts(
             lighting = "温暖电影感灯光，食物高光诱人"
             scene = "真实用餐氛围，顾客自然走动"
         elif include_milk_tea:
-            camera_motion = (
-                "手持镜头穿过排队过道，再跟拍店员半身制作，最后推进产品特写；"
-                "产品特写时手部尽量虚化或出画，避免握杯手指占满画面"
-            )
+            camera_motion = "手持镜头穿过排队过道，再跟拍店员半身制作，最后推进产品特写；"
             lighting = "明亮干净的店内灯光与自然窗光，杯身与奶盖高光诱人"
             scene = (
                 "同一奶茶门店全程高人气；开篇排队清晰，中段吧台忙碌，"
@@ -367,7 +398,7 @@ def build_multi_video_prompts(
                     "name": "写实风格",
                     "camera_motion": "手持镜头穿过拥挤过道，跟随服务员端锅底",
                     "lighting": "暖色吊灯与自然窗光，纪录片写实感",
-                    "scene": "热闹真实的火锅店，木质餐桌，顾客用餐，可见蒸汽和翻滚汤底",
+                    "scene": "开放式现实场景，画面环境、人物互动可自由创作，包含商品特写镜头",
                     "style_tags": REALISTIC_STYLE_TAGS,
                     "negative_tags": REALISTIC_NEGATIVE_TAGS,
                 },
@@ -375,7 +406,7 @@ def build_multi_video_prompts(
                     "name": "仿真人风格",
                     "camera_motion": "平滑电影级轨道镜头，数字人服务员端锅走向餐桌",
                     "lighting": "棚拍三点布光，精致商业调色，浅景深",
-                    "scene": "虚拟制片火锅店场景，超写实数字人员工和顾客，高端广告质感",
+                    "scene": "开放式现实场景，画面环境、人物互动可自由创作，包含商品特写镜头",
                     "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
                     "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
                 },
@@ -384,26 +415,17 @@ def build_multi_video_prompts(
             styles = [
                 {
                     "name": "写实风格",
-                    "camera_motion": (
-                        "手持镜头穿过排队过道，跟拍店员半身制作，再推进珍珠奶茶特写；"
-                        "特写时手部虚化，避免手指占满画面"
-                    ),
+                    "camera_motion": "手持镜头穿过排队过道，跟拍店员半身制作",
                     "lighting": "明亮店内灯光与自然窗光，纪录片写实感",
-                    "scene": (
-                        "热闹真实的奶茶店，同一装修与制服，全程可见排队人流；"
-                        "产品特写背景仍有虚化顾客，热闹感不掉档"
-                    ),
+                    "scene": "开放式现实场景，画面环境、人物互动可自由创作，包含商品特写镜头",
                     "style_tags": REALISTIC_STYLE_TAGS,
                     "negative_tags": REALISTIC_NEGATIVE_TAGS,
                 },
                 {
                     "name": "仿真人风格",
-                    "camera_motion": (
-                        "平滑电影级轨道镜头，数字人店员半身递出珍珠奶茶；"
-                        "结尾产品特写手部出画或虚化"
-                    ),
+                    "camera_motion": "结尾产品特写手部出画或虚化",
                     "lighting": "棚拍三点布光，精致商业调色，浅景深",
-                    "scene": "虚拟制片奶茶店场景，超写实数字人员工和排队顾客，高端广告质感",
+                    "scene": "开放式现实场景，画面环境、人物互动可自由创作，包含商品特写镜头",
                     "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
                     "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
                 },
@@ -414,7 +436,7 @@ def build_multi_video_prompts(
                     "name": "写实风格",
                     "camera_motion": "手持镜头穿过拥挤过道，跟随店员忙碌服务",
                     "lighting": "暖色店内灯光与自然窗光，纪录片写实感",
-                    "scene": "热闹真实的门店，顾客排队等候，店员忙碌制作，产品特写，高人气氛围",
+                    "scene": "开放式现实场景，画面环境、人物互动可自由创作，包含商品特写镜头",
                     "style_tags": REALISTIC_STYLE_TAGS,
                     "negative_tags": REALISTIC_NEGATIVE_TAGS,
                 },
@@ -422,12 +444,11 @@ def build_multi_video_prompts(
                     "name": "仿真人风格",
                     "camera_motion": "平滑电影级轨道镜头，数字人店员展示产品并服务顾客",
                     "lighting": "棚拍三点布光，精致商业调色，浅景深",
-                    "scene": "虚拟制片门店场景，超写实数字人员工和顾客，高端广告质感",
+                    "scene": "开放式现实场景，画面环境、人物互动可自由创作，包含商品特写镜头",
                     "style_tags": DIGITAL_HUMAN_STYLE_TAGS,
                     "negative_tags": DIGITAL_HUMAN_NEGATIVE_TAGS,
                 },
             ]
-
         for i in range(min(quantity, 2)):
             style = styles[i]
             result = build_scene_prompt(
@@ -441,11 +462,12 @@ def build_multi_video_prompts(
                 include_hotpot_constraints=include_hotpot,
                 include_milk_tea_constraints=include_milk_tea,
             )
+            result["prompt"] += "，若是场景切换，请使用合适的运镜，并保持场景的连贯性，避免生硬切换"
             result["ratio"] = aspect_ratio
             result["style_name"] = style["name"]
             prompts.append(result)
-
     return prompts
+
 
 def enhance_video_prompt(
     original_prompt: str,
@@ -454,6 +476,10 @@ def enhance_video_prompt(
     quantity: int = 1,
     user_context: str = "",
 ) -> dict:
+    """
+    对外入口。quantity>1 返回 {"prompts", "ratio"}，否则返回单条 dict。
+    品类检测会合并 user_context；火锅优先于奶茶。
+    """
     scene_prompt = original_prompt.strip()
     if not scene_prompt:
         scene_prompt = "精美食物场景"
@@ -483,10 +509,7 @@ def enhance_video_prompt(
         lighting = "温暖电影感灯光，食物高光诱人"
         scene = "真实用餐氛围，顾客自然走动"
     elif include_milk_tea:
-        camera_motion = (
-            "手持镜头穿过排队过道，再跟拍店员半身制作，最后推进产品特写；"
-            "产品特写时手部尽量虚化或出画，避免握杯手指占满画面"
-        )
+        camera_motion = "手持镜头穿过排队过道，再跟拍店员半身制作，最后推进产品特写；"
         lighting = "明亮干净的店内灯光与自然窗光，杯身与奶盖高光诱人"
         scene = (
             "同一奶茶门店全程高人气；开篇排队清晰，中段吧台忙碌，"
@@ -509,3 +532,226 @@ def enhance_video_prompt(
     result["prompt"] = append_aspect_ratio_hint(result["prompt"], aspect_ratio)
     result["ratio"] = aspect_ratio
     return result
+
+
+# ---------------------------------------------------------------------------
+# LLM 增强：Agnes 2.5 Flash
+# ---------------------------------------------------------------------------
+
+# 可拼进最终视频 prompt 的画面约束（给生成模型看）
+_VIDEO_PROMPT_APPEND_CONSTRAINTS = (
+    "严格匹配用户品类，禁止擅自改成其他品类；"
+    "禁止出现瑞幸、星巴克、喜茶、奈雪等真实连锁品牌及其logo；"
+    "画面为中文商业短视频质感；"
+    "补全主体、产品特写、环境人流、运镜开篇到结尾、光线；"
+    "少拍畸形人手，饮品优先产品居中与半身店员、手部虚化，禁止杯口与人脸穿模；"
+    "冷热饮与蒸汽表现逻辑一致；"
+    "咖啡类强调杯中液体油脂拉花或闻香，不要用珍珠奶茶杯型冒充咖啡；"
+    "开场即出现产品或制作，避免无关空镜；"
+    "场景切换时运镜自然连贯，避免生硬跳切"
+)
+
+# 只给 LLM 的系统指令（含 JSON 格式，不要拼进视频 prompt）
+_PROMPT_ENHANCE_SYSTEM = f"""你是短视频广告提示词专家，负责把用户的简短需求扩写成可直接用于文生视频的中文提示词。
+
+硬性规则：
+1. 严格保留用户品类与品牌意图：用户要咖啡就写咖啡店/咖啡产品，禁止改成奶茶、火锅或其他品类。
+2. 禁止出现任何真实连锁品牌及其 logo（如瑞幸、星巴克、喜茶、奈雪、麦当劳等）。
+3. 输出必须是中文；不要翻译成英文。
+4. 补全可拍细节：主体、产品特写、环境人流、运镜（开篇→中段→结尾）、光线、画幅。
+5. 餐饮类额外注意：少拍畸形人手；饮品优先产品居中、半身店员、手部虚化；禁止杯口与人脸穿模；冷热饮与蒸汽表现要逻辑一致。
+6. 咖啡类：强调杯中液体/油脂/拉花或闻香，不要用珍珠奶茶杯型冒充咖啡；新品名可用虚构简约 logo，不要乱码贴纸堆砌。
+7. 叙事连贯：开场就要出现产品或制作，避免无关路人空镜。
+
+增强后的正向提示词末尾可自然融入这些约束语义：{_VIDEO_PROMPT_APPEND_CONSTRAINTS}
+
+只输出一个 JSON 对象，不要 markdown，不要解释。格式：
+{{"prompt":"增强后的正向提示词","negative_prompt":"负面提示词，逗号分隔","style_name":"可选风格名"}}
+若需要多条（用户要 2 个风格），输出：
+{{"prompts":[{{"prompt":"...","negative_prompt":"...","style_name":"写实风格"}},{{"prompt":"...","negative_prompt":"...","style_name":"仿真人风格"}}]}}
+"""
+
+
+def _append_video_constraints(prompt: str) -> str:
+    """把画面约束拼到增强后的提示词末尾（避免重复拼接）。"""
+    text = (prompt or "").strip()
+    if not text:
+        return _VIDEO_PROMPT_APPEND_CONSTRAINTS
+    if _VIDEO_PROMPT_APPEND_CONSTRAINTS in text:
+        return text
+    return f"{text}，{_VIDEO_PROMPT_APPEND_CONSTRAINTS}"
+
+
+def _extract_json_object(text: str) -> dict[str, Any]:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    try:
+        data = json.loads(cleaned)
+        if isinstance(data, dict):
+            return data
+    except json.JSONDecodeError:
+        pass
+    match = re.search(r"\{[\s\S]*\}", cleaned)
+    if not match:
+        raise ValueError("模型未返回可解析的 JSON")
+    data = json.loads(match.group(0))
+    if not isinstance(data, dict):
+        raise ValueError("模型返回的 JSON 不是对象")
+    return data
+
+
+async def _call_agnes_chat(
+    messages: list[dict[str, str]],
+    *,
+    temperature: float = 0.4,
+    max_tokens: int = 2048,
+) -> str:
+    """调用 Agnes Chat Completions，主模型失败时降级备用文本模型。"""
+    agnes_cfg = config_service.app_config.get("agnes", {}) or {}
+    api_key = (agnes_cfg.get("api_key") or "").strip()
+    base_url = (agnes_cfg.get("url") or "").rstrip("/")
+    if not api_key or not base_url:
+        raise ValueError("未配置 Agnes api_key 或 url")
+
+    models_to_try = [AGNES_TEXT_MODEL_DEFAULT] + [
+        m for m in AGNES_TEXT_MODELS if m != AGNES_TEXT_MODEL_DEFAULT
+    ]
+    last_error: Exception | None = None
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
+        for model_name in models_to_try:
+            payload = {
+                "model": model_name,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": False,
+            }
+            try:
+                print(f"✍️ [PromptEnhance] 调用 Agnes 文本模型: {model_name}")
+                response = await client.post(
+                    f"{base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+                if response.status_code >= 400:
+                    raise RuntimeError(
+                        f"Agnes chat HTTP {response.status_code}: {response.text[:300]}"
+                    )
+                body = response.json()
+                content = (
+                    body.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                )
+                if not content or not str(content).strip():
+                    raise RuntimeError("Agnes chat 返回空内容")
+                return str(content).strip()
+            except Exception as exc:
+                last_error = exc
+                print(f"⚠️ [PromptEnhance] 模型 {model_name} 失败: {exc}")
+                continue
+
+    raise RuntimeError(f"Agnes 提示词增强失败: {last_error}")
+
+
+async def enhance_video_prompt_with_agnes(
+    original_prompt: str,
+    aspect_ratio: str = "9:16",
+    has_reference_image: bool = False,
+    quantity: int = 1,
+    user_context: str = "",
+) -> dict:
+    """
+    用 Agnes 2.5 Flash 增强用户提示词。
+    成功时返回结构与 enhance_video_prompt 一致；失败则回退规则增强。
+    """
+    scene_prompt = (original_prompt or "").strip() or "精美产品宣传场景"
+    qty = max(1, min(2, int(quantity or 1)))
+
+    user_parts = [
+        f"用户需求：{scene_prompt}",
+        f"画幅：{aspect_ratio}",
+        f"生成条数：{qty}（1=单条；2=写实+仿真人两条）",
+        f"是否有参考图：{'是' if has_reference_image else '否'}",
+    ]
+    if user_context.strip():
+        user_parts.append("用户原始上下文：" + user_context.strip())
+    user_parts.append("请按系统要求只输出 JSON。")
+
+    try:
+        raw = await _call_agnes_chat(
+            [
+                {"role": "system", "content": _PROMPT_ENHANCE_SYSTEM},
+                {"role": "user", "content": "\n".join(user_parts)},
+            ]
+        )
+        data = _extract_json_object(raw)
+
+        if qty > 1 and isinstance(data.get("prompts"), list) and data["prompts"]:
+            prompts: list[dict] = []
+            for i, item in enumerate(data["prompts"][:qty]):
+                if not isinstance(item, dict):
+                    continue
+                prompt_text = _append_video_constraints(
+                    str(item.get("prompt") or "").strip()
+                )
+                if not prompt_text:
+                    continue
+                prompts.append(
+                    {
+                        "prompt": append_aspect_ratio_hint(prompt_text, aspect_ratio),
+                        "negative_prompt": str(item.get("negative_prompt") or "").strip(),
+                        "ratio": aspect_ratio,
+                        "style_name": str(
+                            item.get("style_name")
+                            or ("写实风格" if i == 0 else "仿真人风格")
+                        ),
+                    }
+                )
+            if prompts:
+                return {"prompts": prompts, "ratio": aspect_ratio}
+
+        raw_prompt = str(data.get("prompt") or "").strip()
+        if not raw_prompt and isinstance(data.get("prompts"), list) and data["prompts"]:
+            first = data["prompts"][0]
+            if isinstance(first, dict):
+                raw_prompt = str(first.get("prompt") or "").strip()
+
+        if not raw_prompt:
+            raise ValueError("增强结果缺少 prompt 字段")
+
+        prompt_text = _append_video_constraints(raw_prompt)
+
+        result = {
+            "prompt": append_aspect_ratio_hint(prompt_text, aspect_ratio),
+            "negative_prompt": str(data.get("negative_prompt") or "").strip(),
+            "ratio": aspect_ratio,
+        }
+        if qty > 1:
+            # 模型只返回单条时，复制为两条并区分风格名，保证下游 quantity>=2 可跑
+            result_a = {**result, "style_name": "写实风格"}
+            result_b = {
+                **result,
+                "style_name": "仿真人风格",
+                "prompt": append_aspect_ratio_hint(
+                    f"{prompt_text}，数字人元宇宙虚拟形象风格，精致商业广告质感",
+                    aspect_ratio,
+                ),
+            }
+            return {"prompts": [result_a, result_b], "ratio": aspect_ratio}
+        return result
+    except Exception as exc:
+        print(f"⚠️ [PromptEnhance] LLM 增强失败，回退规则增强: {exc}")
+        return enhance_video_prompt(
+            original_prompt=scene_prompt,
+            aspect_ratio=aspect_ratio,
+            has_reference_image=has_reference_image,
+            quantity=qty,
+            user_context=user_context,
+        )
