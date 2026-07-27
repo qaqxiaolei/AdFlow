@@ -45,16 +45,16 @@ const CanvasDeleteDialog: React.FC<CanvasDeleteDialogProps> = ({
 
   const mobileTrigger = React.isValidElement(trigger)
     ? React.cloneElement(
-        trigger as React.ReactElement<{ onClick?: (event: React.MouseEvent) => void }>,
-        {
-          onClick: (event: React.MouseEvent) => {
-            openDialog(event)
-            ;(
+      trigger as React.ReactElement<{ onClick?: (event: React.MouseEvent) => void }>,
+      {
+        onClick: (event: React.MouseEvent) => {
+          openDialog(event)
+            ; (
               trigger as React.ReactElement<{ onClick?: (event: React.MouseEvent) => void }>
             ).props.onClick?.(event)
-          },
-        }
-      )
+        },
+      }
+    )
     : trigger
 
   const actionButtons = (
