@@ -10,10 +10,10 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
-import { PlugZap, Network, ChevronLeft } from 'lucide-react'
+import { UserRound, History, ChevronLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-export type SettingSidebarType = 'provider' | 'proxy'
+export type SettingSidebarType = 'about' | 'history'
 
 type SettingSidebar = {
   current: SettingSidebarType
@@ -28,21 +28,20 @@ const SettingSidebar: React.FC<SettingSidebar> = ({
 }) => {
   const { t } = useTranslation()
 
-  // Menu items.
   const items: {
     type: SettingSidebarType
     title: string
     icon: React.ElementType
   }[] = [
     {
-      type: 'provider',
-      title: 'settings:provider:title',
-      icon: PlugZap,
+      type: 'history',
+      title: 'settings:history.title',
+      icon: History,
     },
     {
-      type: 'proxy',
-      title: 'settings:proxy:title',
-      icon: Network,
+      type: 'about',
+      title: 'settings:about.title',
+      icon: UserRound,
     },
   ]
 

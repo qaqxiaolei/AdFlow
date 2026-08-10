@@ -1,6 +1,25 @@
 {
   "title": "Settings",
   "backToHome": "Back to Home",
+  "about": {
+    "title": "About Me",
+    "subtitle": "Capture your creative inspiration",
+    "appName": "蛮闪",
+    "version": "Version 1.0.0",
+    "introTitle": "About the App",
+    "intro": "蛮闪 is an AI tool for dining and digital content creation. It supports text-to-image, image-to-video, and intelligent scene orchestration, helping you quickly turn ideas into high-quality visuals and keep every spark of inspiration.",
+    "contactTitle": "Contact Us",
+    "addressLabel": "Address",
+    "address": "武汉市东湖高新区光谷创意大厦A座13层",
+    "phoneLabel": "Phone",
+    "phone": "18040503949"
+  },
+  "history": {
+    "title": "History",
+    "loading": "Loading...",
+    "empty": "No history yet",
+    "loginRequired": "Please sign in to view history"
+  },
   "messages": {
     "settingsSaved": "Settings saved successfully",
     "settingsReset": "Settings reset to default",

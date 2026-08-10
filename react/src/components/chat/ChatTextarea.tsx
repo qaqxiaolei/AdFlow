@@ -108,7 +108,6 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const [showAspectRatioPicker, setShowAspectRatioPicker] = useState(false)
   const [showRechargeDialog, setShowRechargeDialog] = useState(false)
   useWechatRechargeReturn(authStatus.is_logged_in, setShowRechargeDialog)
-  const quantitySliderRef = useRef<HTMLDivElement>(null)
   const MAX_QUANTITY = 30
 
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -351,25 +350,6 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }
   }, [uploadImageMutation])
 
-  // Close quantity popover when clicking outside (desktop only)
-  useEffect(() => {
-    if (isMobile || !showQuantitySlider) return
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        quantitySliderRef.current &&
-        !quantitySliderRef.current.contains(event.target as Node)
-      ) {
-        setShowQuantitySlider(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showQuantitySlider, isMobile])
-
   const quantitySliderClass =
     'flex-1 h-3 sm:h-2 bg-muted rounded-lg appearance-none cursor-pointer touch-manipulation ' +
     '[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7 sm:[&::-webkit-slider-thumb]:w-4 sm:[&::-webkit-slider-thumb]:h-4 ' +
@@ -605,8 +585,8 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
             </DropdownMenu>
           )}
 
-          {/* Quantity Selector */}
-          <div className="relative shrink-0" ref={quantitySliderRef}>
+          {/* Quantity Selector：桌面用 Portal 下拉，避免被输入框 / overflow 父级遮挡 */}
+          {isMobile ? (
             <Button
               variant="outline"
               className={cn('inline-flex items-center', toolbarChipButtonClass)}
@@ -617,23 +597,30 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
               <span className="text-xs leading-none">{quantity}</span>
               <ChevronDown className="size-3 shrink-0 opacity-50" />
             </Button>
-
-            {!isMobile && (
-              <AnimatePresence>
-                {showQuantitySlider && (
-                  <motion.div
-                    className="absolute bottom-full mb-2 left-0 z-50 bg-background border border-border rounded-lg p-4 shadow-lg min-w-52"
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.15, ease: 'easeOut' }}
-                  >
-                    {renderQuantityPanelDesktop()}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-          </div>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn('inline-flex items-center', toolbarChipButtonClass)}
+                  size="sm"
+                >
+                  <Hash className="size-3.5 shrink-0" />
+                  <span className="text-xs leading-none">{quantity}</span>
+                  <ChevronDown className="size-3 shrink-0 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                side="top"
+                sideOffset={8}
+                className="z-[200] min-w-52 p-4"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                {renderQuantityPanelDesktop()}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {

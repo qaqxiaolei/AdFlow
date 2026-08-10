@@ -1,6 +1,25 @@
 {
   "title": "设置",
   "backToHome": "返回首页",
+  "about": {
+    "title": "关于我的",
+    "subtitle": "记录你的创作灵感",
+    "appName": "蛮闪",
+    "version": "Version 1.0.0",
+    "introTitle": "应用介绍",
+    "intro": "蛮闪是一款面向餐饮与数字内容创作的 AI 工具，支持文生图、图生视频、智能场景编排等能力，帮助你快速将创意转化为高质量视觉内容，记录并延续每一次灵感。",
+    "contactTitle": "联系我们",
+    "addressLabel": "公司地址",
+    "address": "武汉市东湖高新区光谷创意大厦A座13层",
+    "phoneLabel": "联系电话",
+    "phone": "18040503949"
+  },
+  "history": {
+    "title": "历史记录",
+    "loading": "加载中...",
+    "empty": "暂无历史记录",
+    "loginRequired": "请先登录后查看历史记录"
+  },
   "messages": {
     "settingsSaved": "设置保存成功",
     "settingsReset": "设置已重置为默认值",

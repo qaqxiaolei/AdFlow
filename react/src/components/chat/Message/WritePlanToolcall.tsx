@@ -10,21 +10,21 @@ type PlanStep = {
 function normalizeSteps(raw: unknown): PlanStep[] {
   if (!raw) return []
   if (Array.isArray(raw)) {
-    return raw
-      .map((step) => {
-        if (typeof step === 'string') {
-          return { title: step, description: '' }
-        }
-        if (step && typeof step === 'object') {
-          const obj = step as Record<string, unknown>
-          return {
-            title: String(obj.title ?? obj.name ?? '步骤'),
-            description: String(obj.description ?? obj.desc ?? ''),
-          }
-        }
-        return null
-      })
-      .filter((step): step is PlanStep => Boolean(step))
+    const steps: PlanStep[] = []
+    for (const step of raw) {
+      if (typeof step === 'string') {
+        steps.push({ title: step, description: '' })
+        continue
+      }
+      if (step && typeof step === 'object') {
+        const obj = step as Record<string, unknown>
+        steps.push({
+          title: String(obj.title ?? obj.name ?? '步骤'),
+          description: String(obj.description ?? obj.desc ?? ''),
+        })
+      }
+    }
+    return steps
   }
   if (typeof raw === 'string') {
     try {

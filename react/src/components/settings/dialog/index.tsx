@@ -7,8 +7,8 @@ import { useConfigs } from '@/contexts/configs'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from '@tanstack/react-router'
-import SettingProviders from './providers'
-import SettingProxy from './proxy'
+import SettingAbout from './about'
+import SettingHistory from './history'
 import SettingSidebar, { SettingSidebarType } from './sidebar'
 import { ChevronLeft } from 'lucide-react'
 
@@ -16,7 +16,7 @@ const SettingsDialog = () => {
   const { showSettingsDialog: open, setShowSettingsDialog } = useConfigs()
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [current, setCurrent] = useState<SettingSidebarType>('provider')
+  const [current, setCurrent] = useState<SettingSidebarType>('history')
 
   const handleBackHome = () => {
     setShowSettingsDialog(false)
@@ -25,11 +25,11 @@ const SettingsDialog = () => {
 
   const renderContent = () => {
     switch (current) {
-      case 'proxy':
-        return <SettingProxy />
-      case 'provider':
+      case 'about':
+        return <SettingAbout />
+      case 'history':
       default:
-        return <SettingProviders />
+        return <SettingHistory />
     }
   }
 

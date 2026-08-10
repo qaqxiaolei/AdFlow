@@ -33,8 +33,8 @@ export default function TopMenu({
   return (
     <motion.div
       className={`sticky top-0 z-20 flex w-full min-h-12 sm:min-h-8 py-2 sm:py-0 px-3 sm:px-4 justify-between items-center select-none pt-[max(0.5rem,env(safe-area-inset-top))] ${isHome
-          ? 'bg-transparent border-b border-transparent'
-          : 'bg-background border-b border-border'
+        ? 'bg-transparent border-b border-transparent'
+        : 'bg-background border-b border-border'
         }`}
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -50,7 +50,7 @@ export default function TopMenu({
           )}
           <motion.div className="flex relative overflow-hidden items-start min-h-7 text-base sm:text-xl font-bold min-w-0">
             <motion.span className="truncate" layout>
-              {isHome ? '蛮闪AI' : t('canvas:back')}
+              {isHome ? 'AI数字动画场景应用系统2.0' : t('canvas:back')}
             </motion.span>
           </motion.div>
         </motion.div>

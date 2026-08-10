@@ -15,8 +15,8 @@ const CanvasList: React.FC = () => {
   const userId = authStatus.user_info?.id
 
   const { data: canvases, refetch } = useQuery({
-    queryKey: ['canvases', userId],
-    queryFn: listCanvases,
+    queryKey: ['canvases', userId, 'recent'],
+    queryFn: () => listCanvases({ limit: 3 }),
     enabled: isHomePage && !!userId,
     refetchOnMount: 'always',
     refetchInterval: (query) => {
@@ -28,7 +28,7 @@ const CanvasList: React.FC = () => {
     },
   })
 
-  const recentCanvases = canvases?.slice(0, 3) ?? []
+  const recentCanvases = canvases ?? []
 
   const navigate = useNavigate()
   const handleCanvasClick = (id: string, sessionId: string) => {

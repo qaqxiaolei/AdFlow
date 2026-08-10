@@ -20,8 +20,17 @@ function errorDetail(data: unknown, fallback: string): string {
   return fallback
 }
 
-export async function listCanvases(): Promise<ListCanvasesResponse[]> {
-  const response = await authenticatedFetch('/api/canvas/list')
+export async function listCanvases(options?: {
+  limit?: number
+}): Promise<ListCanvasesResponse[]> {
+  const params = new URLSearchParams()
+  if (options?.limit != null && options.limit > 0) {
+    params.set('limit', String(options.limit))
+  }
+  const query = params.toString()
+  const response = await authenticatedFetch(
+    `/api/canvas/list${query ? `?${query}` : ''}`
+  )
   const data = await response.json().catch(() => ([]))
   if (!response.ok) {
     throw new Error(errorDetail(data, 'Failed to load projects'))

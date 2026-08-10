@@ -929,7 +929,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                         animate={{ opacity: 1, height: 'auto' }}
                                         exit={{ opacity: 0, height: 0 }}
                                         transition={{ duration: 0.2, ease: 'easeInOut' }}
-                                        className='overflow-hidden'
+                                        className='overflow-visible'
                                     >
                                         <ChatTextarea
                                             sessionId={sessionId!}
