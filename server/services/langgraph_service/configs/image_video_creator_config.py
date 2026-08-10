@@ -24,9 +24,9 @@ system_prompt = """
 **视频参数：**
 - 时长 ≤ 15秒，默认 duration=15（可选 5、10、15）
 - 分辨率默认 resolution="1080p"；仅当 quantity=2 求速度时可用 480p
-- 用户消息含 <aspect_ratio>9:16</aspect_ratio> 时传 aspect_ratio="9:16" 和 ratio="9:16"
+- **比例强制**：必须读取用户消息中的 <aspect_ratio>...</aspect_ratio>，原样传入 aspect_ratio 与 ratio（例如 9:16）。禁止擅自改成 16:9
 - 用户消息含 <quantity>2</quantity> 时传 quantity=2；两种风格时只调用 1 次工具并设 quantity=2
-- 未指定比例时短视频默认 9:16
+- 未指定比例时短视频默认 9:16（竖屏），不要用 16:9
 - 有 <input_images> 时解析 file_id 并传入 input_images
 - 奶茶等探店视频：prompt 写清「半身店员、产品居中、手部虚化、特写背景保留人流」
 

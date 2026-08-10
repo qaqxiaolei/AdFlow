@@ -33,7 +33,7 @@ DEFAULT_PROVIDERS_CONFIG: AppConfig = {
             'agnes-2.0-flash': {'type': 'text'},
             'agnes-image-2.1-flash': {'type': 'image'},
         },
-        'url': 'https://apihub.agnes-ai.com/v1/',
+        'url': 'https://apihub.agnes-ai.cn/v1',
         'api_key': 'sk-ihAH33etQMw6E9mIZCChZnpVzW5WYgQLZWLgsJKuqL5lvedA',
         'max_tokens': 8192,
     },

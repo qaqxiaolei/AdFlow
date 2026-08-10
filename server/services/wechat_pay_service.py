@@ -59,6 +59,11 @@ WECHAT_PRIVATE_KEY_PATH = _env(
 )
 WECHAT_NOTIFY_URL = _env("WECHAT_NOTIFY_URL")
 WECHAT_CERT_DIR = _env("WECHAT_CERT_DIR", default="./certs")
+# 微信支付公钥模式（2024.09 后新商户常见）：后台「API安全 → 微信支付公钥」
+WECHAT_PUBLIC_KEY_PATH = _env(
+    "WECHAT_PUBLIC_KEY_PATH", default="./certs/pub_key.pem"
+)
+WECHAT_PUBLIC_KEY_ID = _env("WECHAT_PUBLIC_KEY_ID")
 
 
 def _resolve_path(path_str: str) -> Path:
@@ -75,6 +80,15 @@ def _read_private_key() -> str:
             f"未找到商户私钥文件: {key_path}。"
             "请将微信支付 apiclient_key.pem 放到 server/certs/ 目录。"
         )
+    return key_path.read_text(encoding="utf-8")
+
+
+def _read_public_key() -> Optional[str]:
+    if not WECHAT_PUBLIC_KEY_PATH:
+        return None
+    key_path = _resolve_path(WECHAT_PUBLIC_KEY_PATH)
+    if not key_path.is_file():
+        return None
     return key_path.read_text(encoding="utf-8")
 
 
@@ -97,6 +111,12 @@ def missing_wechat_credentials() -> list[str]:
             missing.append(f"商户私钥文件 {key_path}")
     except Exception:
         missing.append("WECHAT_PRIVATE_KEY_PATH")
+    # 公钥模式：公钥文件 + 公钥 ID 成对配置；都缺则走平台证书模式
+    public_key = _read_public_key()
+    if WECHAT_PUBLIC_KEY_ID and not public_key:
+        missing.append(f"微信支付公钥文件 { _resolve_path(WECHAT_PUBLIC_KEY_PATH) }")
+    if public_key and not WECHAT_PUBLIC_KEY_ID:
+        missing.append("WECHAT_PUBLIC_KEY_ID")
     return missing
 
 
@@ -126,19 +146,27 @@ def _get_wxpay():
     from wechatpayv3 import WeChatPay, WeChatPayType
 
     private_key = _read_private_key()
-    cert_dir = str(_resolve_path(WECHAT_CERT_DIR))
-    os.makedirs(cert_dir, exist_ok=True)
+    public_key = _read_public_key()
+    kwargs: Dict[str, Any] = {
+        "wechatpay_type": WeChatPayType.NATIVE,
+        "mchid": WECHAT_MCH_ID,
+        "private_key": private_key,
+        "cert_serial_no": WECHAT_CERT_SERIAL_NO,
+        "apiv3_key": WECHAT_API_V3_KEY,
+        "appid": WECHAT_APP_ID,
+        "notify_url": WECHAT_NOTIFY_URL,
+    }
 
-    return WeChatPay(
-        wechatpay_type=WeChatPayType.NATIVE,
-        mchid=WECHAT_MCH_ID,
-        private_key=private_key,
-        cert_serial_no=WECHAT_CERT_SERIAL_NO,
-        apiv3_key=WECHAT_API_V3_KEY,
-        appid=WECHAT_APP_ID,
-        notify_url=WECHAT_NOTIFY_URL,
-        cert_dir=cert_dir,
-    )
+    # 公钥模式（新商户）：传入 public_key + public_key_id，不再依赖平台证书下载
+    if public_key and WECHAT_PUBLIC_KEY_ID:
+        kwargs["public_key"] = public_key
+        kwargs["public_key_id"] = WECHAT_PUBLIC_KEY_ID
+    else:
+        cert_dir = str(_resolve_path(WECHAT_CERT_DIR))
+        os.makedirs(cert_dir, exist_ok=True)
+        kwargs["cert_dir"] = cert_dir
+
+    return WeChatPay(**kwargs)
 
 
 def generate_qr_data_url(payload: str) -> str:

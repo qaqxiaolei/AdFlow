@@ -53,15 +53,37 @@ def _strip_generation_tags(text: str) -> str:
     return cleaned.strip()
 
 
+def _get_raw_user_prompt(config: RunnableConfig) -> str:
+    configurable = config.get("configurable", {})
+    if isinstance(configurable, dict):
+        return str(configurable.get("user_prompt", "") or "")
+    return ""
+
+
 def _resolve_aspect_ratio(
     prompt: str,
     aspect_ratio: str,
     ratio: str,
+    config: Optional[RunnableConfig] = None,
 ) -> str:
+    """优先使用用户消息中的 <aspect_ratio> 标签，避免被 strip 后丢失。
+
+    Agent 常误传 Seedance/训练默认的 16:9；在无用户标签时忽略该遗留默认，回退到 9:16。
+    """
+    # 1. 用户原始消息标签（最高优先级；须在 strip 前读取）
+    if config is not None:
+        user_ratio = _normalize_aspect_ratio(
+            _extract_tag_value(_get_raw_user_prompt(config), "aspect_ratio")
+        )
+        if user_ratio:
+            return user_ratio
+
+    # 2. 工具 prompt 中仍带有的标签
     prompt_ratio = _normalize_aspect_ratio(_extract_tag_value(prompt, "aspect_ratio"))
     if prompt_ratio:
         return prompt_ratio
 
+    # 3. 工具显式参数；忽略 LLM 常误传的 16:9 遗留默认
     for candidate in (ratio, aspect_ratio):
         normalized = _normalize_aspect_ratio(candidate)
         if normalized and normalized != LEGACY_DEFAULT_ASPECT_RATIO:
@@ -71,10 +93,7 @@ def _resolve_aspect_ratio(
 
 
 def _get_user_prompt(config: RunnableConfig) -> str:
-    configurable = config.get("configurable", {})
-    if isinstance(configurable, dict):
-        return _strip_generation_tags(configurable.get("user_prompt", ""))
-    return ""
+    return _strip_generation_tags(_get_raw_user_prompt(config))
 
 
 def _is_primarily_english(text: str) -> bool:
@@ -108,13 +127,22 @@ def _resolve_prompt(prompt: str, config: RunnableConfig) -> str:
     raise ValueError("缺少视频生成提示词 prompt，请提供场景描述")
 
 
-def _resolve_quantity(prompt: str, quantity: int) -> int:
-    prompt_quantity = _extract_tag_value(prompt, "quantity")
-    if prompt_quantity:
-        try:
-            return max(1, min(2, int(prompt_quantity)))
-        except ValueError:
-            pass
+def _resolve_quantity(
+    prompt: str,
+    quantity: int,
+    config: Optional[RunnableConfig] = None,
+) -> int:
+    sources = []
+    if config is not None:
+        sources.append(_get_raw_user_prompt(config))
+    sources.append(prompt or "")
+    for source in sources:
+        prompt_quantity = _extract_tag_value(source, "quantity")
+        if prompt_quantity:
+            try:
+                return max(1, min(2, int(prompt_quantity)))
+            except ValueError:
+                pass
     return max(1, min(2, quantity))
 
 
@@ -222,12 +250,14 @@ async def generate_video_by_agnes(
     input_images: Any = None,
     quantity: int = 1,
 ) -> str:
+    # 比例/数量必须在 strip 标签前从用户原文解析，否则会丢失前端传入的 9:16
+    actual_ratio = _resolve_aspect_ratio(prompt, aspect_ratio, ratio, config)
+    resolved_quantity = _resolve_quantity(prompt, quantity, config)
     resolved_prompt = _resolve_prompt(prompt, config)
-    actual_ratio = _resolve_aspect_ratio(resolved_prompt, aspect_ratio, ratio)
-    resolved_quantity = _resolve_quantity(resolved_prompt, quantity)
     print(
         f"🎥 [GenerateVideo] 使用比例: {actual_ratio}, "
-        f"生成数量: {resolved_quantity}"
+        f"生成数量: {resolved_quantity} "
+        f"(工具参数 aspect_ratio={aspect_ratio!r}, ratio={ratio!r})"
     )
 
     processed_input_images = None
@@ -256,6 +286,7 @@ async def generate_video_by_agnes(
         has_reference_image=bool(has_reference_image),
         quantity=resolved_quantity,
         user_context=_get_user_prompt(config),
+        input_images=processed_input_images,
     )
     
     print('🎥 [GenerateVideo] 增强后的提示词', prompt_result)

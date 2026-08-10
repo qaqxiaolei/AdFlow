@@ -167,6 +167,7 @@ async def serve_react_app():
     response.headers["Expires"] = "0"
     return response
 
+
 print('Creating socketio app')
 socket_app = socketio.ASGIApp(sio, other_asgi_app=app, socketio_path='/socket.io')
 

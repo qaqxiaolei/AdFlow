@@ -57,20 +57,29 @@ class DatabaseService:
             """, (id, name, session_id, user_id))
             await db.commit()
 
-    async def list_canvases(self, user_id: str) -> List[Dict[str, Any]]:
-        """获取该用户最近的项目（最多保留 MAX_CANVAS_COUNT 个）"""
-        await self.prune_canvases(user_id, MAX_CANVAS_COUNT)
+    async def list_canvases(
+        self, user_id: str, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """获取该用户项目（按更新时间倒序）。limit 为空则返回全部。"""
         async with aiosqlite.connect(self.db_path, timeout=30) as db:
             await db.execute("PRAGMA journal_mode=WAL")
             await db.execute("PRAGMA busy_timeout=30000")
             db.row_factory = sqlite3.Row
-            cursor = await db.execute("""
-                SELECT id, name, description, thumbnail, created_at, updated_at, session_id
-                FROM canvases
-                WHERE user_id = ?
-                ORDER BY updated_at DESC
-                LIMIT ?
-            """, (user_id, MAX_CANVAS_COUNT))
+            if limit is not None and limit > 0:
+                cursor = await db.execute("""
+                    SELECT id, name, description, thumbnail, created_at, updated_at, session_id
+                    FROM canvases
+                    WHERE user_id = ?
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                """, (user_id, limit))
+            else:
+                cursor = await db.execute("""
+                    SELECT id, name, description, thumbnail, created_at, updated_at, session_id
+                    FROM canvases
+                    WHERE user_id = ?
+                    ORDER BY updated_at DESC
+                """, (user_id,))
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
 

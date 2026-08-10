@@ -34,7 +34,7 @@ def build_image_api_url(base_url: str) -> str:
     构建图片生成完整 API URL
 
     Args:
-        base_url: 基础 URL，如 "https://apihub.agnes-ai.com/v1"
+        base_url: 基础 URL，如 "https://apihub.agnes-ai.cn/v1"
 
     Returns:
         完整的图片生成 API URL
@@ -48,7 +48,7 @@ def build_video_api_url(base_url: str) -> str:
     构建视频生成完整 API URL
 
     Args:
-        base_url: 基础 URL，如 "https://apihub.agnes-ai.com/v1"
+        base_url: 基础 URL，如 "https://apihub.agnes-ai.cn/v1"
 
     Returns:
         完整的视频生成 API URL
@@ -62,7 +62,7 @@ def build_video_poll_url(base_url: str, task_id: str) -> str:
     构建视频任务状态轮询完整 URL
 
     Args:
-        base_url: 基础 URL，如 "https://apihub.agnes-ai.com/v1"
+        base_url: 基础 URL，如 "https://apihub.agnes-ai.cn/v1"
         task_id: 任务 ID
 
     Returns:
@@ -96,10 +96,10 @@ def get_api_root(base_url: str) -> str:
     获取 API 根地址（移除 /v1 后缀）
 
     Args:
-        base_url: 基础 URL，如 "https://apihub.agnes-ai.com/v1"
+        base_url: 基础 URL，如 "https://apihub.agnes-ai.cn/v1"
 
     Returns:
-        API 根地址，如 "https://apihub.agnes-ai.com"
+        API 根地址，如 "https://apihub.agnes-ai.cn"
     """
     url = base_url.rstrip("/")
     if url.endswith("/v1"):

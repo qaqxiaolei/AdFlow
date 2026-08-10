@@ -102,13 +102,15 @@ async def generate_video_with_provider(
         if input_images:
             # 部分 provider 可能需要不同的图片处理方式，目前原样传递
             processed_input_images = input_images
+        # ratio 与 aspect_ratio 同义；优先使用显式 ratio，避免方舟未传参时落到 16:9
+        effective_ratio = (ratio or aspect_ratio or "9:16").strip() or "9:16"
         # 调用所选 provider 生成视频
         video_url = await provider_instance.generate(
             prompt=prompt,
             model=model,
             resolution=resolution,
             duration=duration,
-            aspect_ratio=aspect_ratio,
+            aspect_ratio=effective_ratio,
             input_images=processed_input_images,
             camera_fixed=camera_fixed,
             session_id=session_id,

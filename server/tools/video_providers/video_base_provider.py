@@ -34,7 +34,7 @@ class VideoProviderBase(ABC):
         model: str,
         resolution: str = "480p",
         duration: int = 5,
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "9:16",
         input_images: Optional[list[str]] = None,
         camera_fixed: bool = True,
         **kwargs: Any
@@ -46,7 +46,7 @@ class VideoProviderBase(ABC):
             model: 用于生成的模型名称
             resolution: 视频分辨率（480p、1080p）
             duration: 视频时长（秒，如 5、10）
-            aspect_ratio: 视频宽高比（1:1、16:9、4:3、21:9）
+            aspect_ratio: 视频宽高比（1:1、16:9、9:16、4:3、21:9），短视频默认 9:16
             input_images: 可选的参考图/首帧图片
             camera_fixed: 是否固定镜头
             **kwargs: 各 provider 特有的额外参数

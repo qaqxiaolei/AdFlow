@@ -63,6 +63,8 @@ Agnes 文本生成模型列表（按优先级排序）
 AGNES_TEXT_MODEL_DEFAULT: str = AGNES_TEXT_MODELS[0]
 """默认文本生成模型（视频提示词增强等）"""
 
+AGNES_VISION_MODEL: str = "agnes-2.0-flash"
+"""参考图识图 / 多模态描述默认模型"""
 
 def get_image_models_with_fallback() -> tuple[str, List[str]]:
     """
@@ -135,6 +137,7 @@ __all__ = [
     "is_valid_volces_video_model",
     "AGNES_TEXT_MODELS",
     "AGNES_TEXT_MODEL_DEFAULT",
+    "AGNES_VISION_MODEL",
     "get_image_models_with_fallback",
     "get_video_models_with_fallback",
     "is_valid_image_model",

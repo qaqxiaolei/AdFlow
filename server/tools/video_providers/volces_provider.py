@@ -86,7 +86,8 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
         self._append_images_to_content(content, input_image_data)
 
         clamped_duration = max(4, min(15, duration))
-        ratio = aspect_ratio if input_image_data else aspect_ratio
+        # Seedance 未传 ratio 时默认 16:9；必须显式写入用户选择的比例（如 9:16）
+        ratio = (aspect_ratio or "9:16").strip() or "9:16"
 
         payload: Dict[str, Any] = {
             "model": model,
@@ -97,6 +98,11 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
             "watermark": False,
             "generate_audio": kwargs.get("generate_audio", True),
         }
+        print(
+            f"🎥 [Volces] Seedance2 payload ratio={ratio}, "
+            f"resolution={resolution}, duration={clamped_duration}, "
+            f"has_images={bool(input_image_data)}"
+        )
         return payload
 
     def _build_seedance_v1_payload(
@@ -115,8 +121,9 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
             f"--camerafixed {str(camera_fixed).lower()} "
             f"--wm false"
         )
-        if not input_image_data:
-            command += f" --rt {aspect_ratio}"
+        # 图生视频也必须带比例，否则方舟默认 16:9，与前端 9:16 不一致
+        ratio = (aspect_ratio or "9:16").strip() or "9:16"
+        command += f" --rt {ratio}"
 
         content: List[Dict[str, Any]] = [
             {"type": "text", "text": prompt + " " + command}
@@ -136,7 +143,7 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
         model: str | None = None,
         resolution: str = "480p",
         duration: int = 5,
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "9:16",
         camera_fixed: bool = True,
         input_image_data: Optional[List[str]] = None,
         **kwargs: Any,
@@ -259,7 +266,7 @@ class VolcesVideoProvider(VideoProviderBase, provider_name="volces"):
         model: str,
         resolution: str = "480p",
         duration: int = 5,
-        aspect_ratio: str = "16:9",
+        aspect_ratio: str = "9:16",
         input_images: Optional[List[str]] = None,
         camera_fixed: bool = True,
         **kwargs: Any,

@@ -6,8 +6,8 @@ from typing import Dict
 sio = socketio.AsyncServer(
     cors_allowed_origins="*",
     async_mode='asgi',
-    ping_interval=25,
-    ping_timeout=60
+    ping_interval=30,
+    ping_timeout=120
 )
 
 active_connections: Dict[str, dict] = {}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from services.chat_service import handle_chat
 from services.db_service import db_service
 from services.canvas_cover_service import (
@@ -13,13 +13,19 @@ from services.canvas_cover_service import (
 from routers.auth_router import get_current_user_id
 import asyncio
 import json
+from typing import Optional
 
 router = APIRouter(prefix="/api/canvas")
 
 
 @router.get("/list")
-async def list_canvases(user_id: str = Depends(get_current_user_id)):
-    canvases = await db_service.list_canvases(user_id)
+async def list_canvases(
+    user_id: str = Depends(get_current_user_id),
+    limit: Optional[int] = Query(
+        None, ge=1, description="仅返回最近 N 条；不传则返回当前账号全部项目"
+    ),
+):
+    canvases = await db_service.list_canvases(user_id, limit=limit)
     schedule_missing_canvas_covers(canvases)
     schedule_missing_canvas_names(canvases)
     return canvases
@@ -38,7 +44,6 @@ async def create_canvas(
     name = build_canvas_name_from_prompt(prompt) if prompt else fallback_name
     data["user_id"] = user_id
     await db_service.create_canvas(id, name, session_id, user_id=user_id)
-    await db_service.prune_canvases(user_id)
     asyncio.create_task(handle_chat(data))
     schedule_canvas_cover_generation(id, messages)
     if name in DEFAULT_CANVAS_NAMES:
