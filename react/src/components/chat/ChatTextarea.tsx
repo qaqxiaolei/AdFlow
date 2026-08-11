@@ -22,8 +22,10 @@ import {
   XIcon,
   RectangleVertical,
   ChevronDown,
-  Hash,
+  ImageIcon,
+  Clapperboard,
 } from 'lucide-react'
+import type { GenerationMode } from '@/stores/configs'
 import { AnimatePresence, motion } from 'motion/react'
 import Textarea, { TextAreaRef } from 'rc-textarea'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -89,7 +91,8 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const { t } = useTranslation()
   const isMobile = useIsMobile()
   const { authStatus, openAuthDialog } = useAuth()
-  const { textModel, selectedTools } = useConfigs()
+  const { textModel, selectedTools, generationMode, setGenerationMode } =
+    useConfigs()
   const { balance } = useBalance()
   const [prompt, setPrompt] = useState('')
   const [isComposing, setIsComposing] = useState(false)
@@ -102,13 +105,14 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }[]
   >([])
   const [isFocused, setIsFocused] = useState(false)
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>('9:16')
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>(() =>
+    generationMode === 'image' ? '1:1' : '9:16'
+  )
   const [quantity, setQuantity] = useState<number>(2)
   const [showQuantitySlider, setShowQuantitySlider] = useState(false)
   const [showAspectRatioPicker, setShowAspectRatioPicker] = useState(false)
   const [showRechargeDialog, setShowRechargeDialog] = useState(false)
   useWechatRechargeReturn(authStatus.is_logged_in, setShowRechargeDialog)
-  const MAX_QUANTITY = 30
 
   const imageInputRef = useRef<HTMLInputElement>(null)
 
@@ -172,6 +176,20 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
 
   const canSend = prompt.trim().length > 0 && !pending && !isComposing
 
+  const modeTools = (selectedTools || []).filter(
+    (tool) => tool.type === generationMode
+  )
+
+  const handleGenerationModeChange = useCallback(
+    (mode: GenerationMode) => {
+      if (mode === generationMode) return
+      setGenerationMode(mode)
+      // 切换模式时给出更符合场景的默认比例
+      setSelectedAspectRatio(mode === 'image' ? '1:1' : '9:16')
+    },
+    [generationMode, setGenerationMode]
+  )
+
   // Send Prompt
   const handleSendPrompt = useCallback(async () => {
     if (pending) return
@@ -179,9 +197,8 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       openAuthDialog()
       return
     }
-    const hasVideoTool = selectedTools?.some((tool) => tool.type === 'video')
     // 登录用户积分不足时拦截（视频生成会扣积分）
-    if (hasVideoTool && parseFloat(balance) <= 0) {
+    if (generationMode === 'video' && parseFloat(balance) <= 0) {
       toast.error(t('chat:insufficientBalance'), {
         description: <RechargeContent />,
         duration: 10000,
@@ -192,8 +209,12 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       toast.error(t('chat:textarea.selectModel'))
       return
     }
-    if (!selectedTools || selectedTools.length === 0) {
-      toast.warning(t('chat:textarea.selectTool'))
+    if (modeTools.length === 0) {
+      toast.warning(
+        generationMode === 'image'
+          ? t('chat:textarea.selectImageTool')
+          : t('chat:textarea.selectVideoTool')
+      )
     }
     let text_content: MessageContent[] | string = prompt
     if (prompt.length === 0 || prompt.trim() === '') {
@@ -208,6 +229,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     if (quantity !== 1) {
       additionalInfo += `<quantity>${quantity}</quantity>\n`
     }
+    additionalInfo += `<generation_mode>${generationMode}</generation_mode>\n`
     if (additionalInfo) {
       text_content = text_content + '\n\n' + additionalInfo
     }
@@ -251,12 +273,12 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     setPrompt('')
     onSendMessages(newMessage, {
       textModel: textModel,
-      toolList: selectedTools && selectedTools.length > 0 ? selectedTools : [],
+      toolList: modeTools,
     })
   }, [
     pending,
     textModel,
-    selectedTools,
+    modeTools,
     prompt,
     onSendMessages,
     images,
@@ -264,6 +286,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     t,
     selectedAspectRatio,
     quantity,
+    generationMode,
     authStatus.is_logged_in,
     openAuthDialog,
     balance,
@@ -350,20 +373,16 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     }
   }, [uploadImageMutation])
 
-  const quantitySliderClass =
-    'flex-1 h-3 sm:h-2 bg-muted rounded-lg appearance-none cursor-pointer touch-manipulation ' +
-    '[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7 sm:[&::-webkit-slider-thumb]:w-4 sm:[&::-webkit-slider-thumb]:h-4 ' +
-    '[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-sm ' +
-    '[&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:h-7 sm:[&::-moz-range-thumb]:w-4 sm:[&::-moz-range-thumb]:h-4 ' +
-    '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0'
-
   const renderQuantityPanelDesktop = () => (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">
           {t('chat:textarea.quantity', '生成数量')}
         </span>
-        <span className="text-sm text-muted-foreground tabular-nums">{quantity}</span>
+        <span className="text-sm text-muted-foreground tabular-nums">
+          {quantity}
+          {t('chat:textarea.quantityUnit', '个')}
+        </span>
       </div>
       <div className="flex gap-2">
         {[1, 2].map((value) => (
@@ -377,20 +396,6 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
             {value}
           </Button>
         ))}
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground shrink-0">1</span>
-        <input
-          type="range"
-          min="1"
-          max={MAX_QUANTITY}
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-          className={quantitySliderClass}
-        />
-        <span className="text-xs text-muted-foreground shrink-0">
-          {MAX_QUANTITY}
-        </span>
       </div>
     </div>
   )
@@ -499,7 +504,11 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       <Textarea
         ref={textareaRef}
         className="w-full h-full border-none outline-none resize-none"
-        placeholder={t('chat:textarea.placeholder')}
+        placeholder={
+          generationMode === 'image'
+            ? t('chat:textarea.placeholderImage')
+            : t('chat:textarea.placeholderVideo')
+        }
         value={prompt}
         autoSize={autoSize}
         onChange={(e) => setPrompt(e.target.value)}
@@ -524,6 +533,43 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+          <div
+            className="inline-flex h-8 shrink-0 items-center rounded-lg border border-border bg-muted/60 p-0.5"
+            role="tablist"
+            aria-label={t('chat:textarea.generationMode', '生成模式')}
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={generationMode === 'image'}
+              className={cn(
+                'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors touch-manipulation',
+                generationMode === 'image'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => handleGenerationModeChange('image')}
+            >
+              <ImageIcon className="size-3.5 shrink-0" />
+              <span>{t('chat:textarea.modeImage', '生图片')}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={generationMode === 'video'}
+              className={cn(
+                'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors touch-manipulation',
+                generationMode === 'video'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => handleGenerationModeChange('video')}
+            >
+              <Clapperboard className="size-3.5 shrink-0" />
+              <span>{t('chat:textarea.modeVideo', '生视频')}</span>
+            </button>
+          </div>
+
           <input
             ref={imageInputRef}
             type="file"
@@ -592,9 +638,12 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
               className={cn('inline-flex items-center', toolbarChipButtonClass)}
               onClick={() => setShowQuantitySlider(true)}
               size="sm"
+              title={t('chat:textarea.quantity', '生成数量')}
             >
-              <Hash className="size-3.5 shrink-0" />
-              <span className="text-xs leading-none">{quantity}</span>
+              <span className="text-xs leading-none tabular-nums">
+                {quantity}
+                {t('chat:textarea.quantityUnit', '个')}
+              </span>
               <ChevronDown className="size-3 shrink-0 opacity-50" />
             </Button>
           ) : (
@@ -604,9 +653,12 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
                   variant="outline"
                   className={cn('inline-flex items-center', toolbarChipButtonClass)}
                   size="sm"
+                  title={t('chat:textarea.quantity', '生成数量')}
                 >
-                  <Hash className="size-3.5 shrink-0" />
-                  <span className="text-xs leading-none">{quantity}</span>
+                  <span className="text-xs leading-none tabular-nums">
+                    {quantity}
+                    {t('chat:textarea.quantityUnit', '个')}
+                  </span>
                   <ChevronDown className="size-3 shrink-0 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>

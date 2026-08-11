@@ -1,6 +1,8 @@
 {
   "title": "Hello, Restaurant Owner!",
   "subtitle": "Ready to turn your ideas into art?",
+  "subtitleImage": "Ready to turn your ideas into beautiful images?",
+  "subtitleVideo": "Ready to turn your ideas into promotional videos?",
   "allProjects": "Recent Projects",
   "noCanvases": "No canvases yet",
   "newCanvas": "Untitled"

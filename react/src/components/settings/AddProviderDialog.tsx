@@ -85,7 +85,6 @@ const PROVIDER_OPTIONS = [
         'doubao-seed-1-6-250615': { type: 'text' },
         'doubao-seed-1-6-thinking-250615': { type: 'text' },
         'doubao-seed-1-6-flash-250615': { type: 'text' },
-        'doubao-seedream-3-0-t2i-250415': { type: 'image' },
         'doubao-seedance-1-0-pro-250528': { type: 'video' },
         'doubao-seedance-1-0-lite-i2v-250428': { type: 'video' },
         'doubao-seedance-1-0-lite-t2v-250428': { type: 'video' },

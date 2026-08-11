@@ -68,20 +68,23 @@ export const ConfigsProvider = ({
       setTextModel(llmModels.find((m) => m.type === 'text'))
     }
 
-    // 设置选中的工具模型
-    const disabledToolsJson = localStorage.getItem('disabled_tool_ids')
-    let currentSelectedTools: ToolInfo[] = []
-    // by default, all tools are selected
-    currentSelectedTools = toolList
-    if (disabledToolsJson) {
-      try {
-        const disabledToolIds: string[] = JSON.parse(disabledToolsJson)
-        // filter out disabled tools
-        currentSelectedTools = toolList.filter(
-          (t) => !disabledToolIds.includes(t.id)
-        )
-      } catch (error) {
-        console.error(error)
+    // 设置选中的工具模型（默认自动：全选；仅当显式关闭自动时才读 disabled 列表）
+    const preferAuto = localStorage.getItem('tool_auto_mode') !== 'false'
+    let currentSelectedTools: ToolInfo[] = toolList
+    if (preferAuto) {
+      currentSelectedTools = toolList
+      localStorage.setItem('disabled_tool_ids', JSON.stringify([]))
+    } else {
+      const disabledToolsJson = localStorage.getItem('disabled_tool_ids')
+      if (disabledToolsJson) {
+        try {
+          const disabledToolIds: string[] = JSON.parse(disabledToolsJson)
+          currentSelectedTools = toolList.filter(
+            (t) => !disabledToolIds.includes(t.id)
+          )
+        } catch (error) {
+          console.error(error)
+        }
       }
     }
 

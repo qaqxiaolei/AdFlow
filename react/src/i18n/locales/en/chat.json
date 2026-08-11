@@ -5,10 +5,18 @@
   "insufficientBalanceDescription": "Your credits are depleted. Please recharge to continue.",
   "textarea": {
     "placeholder": "Enter your design requirements",
+    "placeholderImage": "Describe the image you want to generate…",
+    "placeholderVideo": "Describe the video you want to generate…",
+    "generationMode": "Generation mode",
+    "modeImage": "Image",
+    "modeVideo": "Video",
     "selectModel": "Please select a text model! Go to Settings to set your API keys if you haven't done so.",
     "selectTool": "Please go to settings to add image or video generation tools, or you won't be able to generate any images or videos!!",
+    "selectImageTool": "Please select an image generation tool first.",
+    "selectVideoTool": "Please select a video generation tool first.",
     "enterPrompt": "Please enter a prompt",
-    "quantity": "Image Quantity"
+    "quantity": "Image Quantity",
+    "quantityUnit": "pcs"
   },
   "messages": {
     "imagePositioning": "Go to image",

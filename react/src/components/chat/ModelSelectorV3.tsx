@@ -37,15 +37,47 @@ const ModelSelectorV3: React.FC<ModelSelectorV3Props> = ({
     selectedTools,
     setSelectedTools,
     allTools,
+    generationMode,
   } = useConfigs()
 
-  const [activeTab, setActiveTab] = useState<'image' | 'video' | 'text'>('image')
+  const [activeTab, setActiveTab] = useState<'image' | 'video' | 'text'>(
+    generationMode
+  )
   const [open, setOpen] = useState(false)
   const { t } = useTranslation()
   const isMobile = useIsMobile()
 
-  const initialAutoMode = allTools.length > 0 && selectedTools.length === allTools.length
+  const initialAutoMode =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('tool_auto_mode') !== 'false'
+      : true
   const [autoMode, setAutoMode] = useState(initialAutoMode)
+
+  useEffect(() => {
+    setActiveTab(generationMode)
+  }, [generationMode])
+
+  useEffect(() => {
+    if (allTools.length === 0) return
+    if (autoMode) {
+      const allSelected =
+        selectedTools.length === allTools.length &&
+        allTools.every((tool) =>
+          selectedTools.some((selected) => selected.id === tool.id)
+        )
+      if (!allSelected) {
+        setSelectedTools(allTools)
+        localStorage.setItem('disabled_tool_ids', JSON.stringify([]))
+      }
+    } else {
+      const isAllSelected =
+        selectedTools.length === allTools.length && allTools.length > 0
+      if (isAllSelected) {
+        setAutoMode(true)
+        localStorage.setItem('tool_auto_mode', 'true')
+      }
+    }
+  }, [allTools, autoMode, selectedTools, setSelectedTools])
 
   useEffect(() => {
     if (open && allTools.length === 0 && textModels.length === 0) {
@@ -114,6 +146,7 @@ const ModelSelectorV3: React.FC<ModelSelectorV3Props> = ({
 
       const isAuto = newSelected.length === allTools.length
       setAutoMode(isAuto)
+      localStorage.setItem('tool_auto_mode', isAuto ? 'true' : 'false')
     }
     onModelToggle?.(modelKey, checked)
   }
@@ -129,6 +162,7 @@ const ModelSelectorV3: React.FC<ModelSelectorV3Props> = ({
     } else {
       if (autoMode) {
         setAutoMode(false)
+        localStorage.setItem('tool_auto_mode', 'false')
         const tool = allTools.find((m) => m.provider + ':' + m.id === modelKey)
         if (tool) {
           setSelectedTools([tool])
@@ -177,6 +211,7 @@ const ModelSelectorV3: React.FC<ModelSelectorV3Props> = ({
       }
     }
     setAutoMode(enabled)
+    localStorage.setItem('tool_auto_mode', enabled ? 'true' : 'false')
     onAutoToggle?.(enabled)
   }
 

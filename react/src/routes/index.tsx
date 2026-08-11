@@ -26,7 +26,7 @@ export const Route = createFileRoute('/')({
 function Home() {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { setInitCanvas } = useConfigs()
+  const { setInitCanvas, generationMode } = useConfigs()
   const [activeVideo, setActiveVideo] = useState(0)
   /** 仅当视频真正开始播放时才显示，避免微信露出大播放按钮 */
   const [playingVisible, setPlayingVisible] = useState(false)
@@ -163,7 +163,9 @@ function Home() {
               transition={{ duration: 0.5 }}
             >
               <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8 text-center px-2">
-                {t('home:subtitle')}
+                {generationMode === 'image'
+                  ? t('home:subtitleImage')
+                  : t('home:subtitleVideo')}
               </p>
             </motion.div>
 

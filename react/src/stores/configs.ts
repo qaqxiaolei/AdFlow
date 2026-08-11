@@ -2,6 +2,8 @@ import { ModelInfo, ToolInfo } from '@/api/model'
 import { LLMConfig, Model } from '@/types/types'
 import { create } from 'zustand'
 
+export type GenerationMode = 'image' | 'video'
+
 type ConfigsStore = {
   initCanvas: boolean
   setInitCanvas: (initCanvas: boolean) => void
@@ -14,6 +16,9 @@ type ConfigsStore = {
 
   textModel?: Model
   setTextModel: (model?: Model) => void
+
+  generationMode: GenerationMode
+  setGenerationMode: (mode: GenerationMode) => void
 
   showInstallDialog: boolean
   setShowInstallDialog: (show: boolean) => void
@@ -33,6 +38,12 @@ type ConfigsStore = {
   setProviders: (providers: { [key: string]: LLMConfig }) => void
 }
 
+function readStoredGenerationMode(): GenerationMode {
+  if (typeof localStorage === 'undefined') return 'video'
+  const stored = localStorage.getItem('generation_mode')
+  return stored === 'image' || stored === 'video' ? stored : 'video'
+}
+
 const useConfigsStore = create<ConfigsStore>((set) => ({
   initCanvas: false,
   setInitCanvas: (initCanvas) => set({ initCanvas }),
@@ -42,6 +53,12 @@ const useConfigsStore = create<ConfigsStore>((set) => ({
 
   textModel: undefined,
   setTextModel: (model) => set({ textModel: model }),
+
+  generationMode: readStoredGenerationMode(),
+  setGenerationMode: (mode) => {
+    localStorage.setItem('generation_mode', mode)
+    set({ generationMode: mode })
+  },
 
   showInstallDialog: false,
   setShowInstallDialog: (show) => set({ showInstallDialog: show }),
