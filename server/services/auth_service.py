@@ -15,9 +15,10 @@ import jwt
 from services.config_service import USER_DATA_DIR
 from services.password_policy import validate_password, validate_phone
 
-# 新用户免费视频积分；单次视频生成消耗
+# 新用户免费视频积分；单次视频 / 单张图片消耗
 NEW_USER_FREE_CREDITS = float(os.environ.get("NEW_USER_FREE_CREDITS", "450"))
 VIDEO_CREDIT_COST = float(os.environ.get("VIDEO_CREDIT_COST", "75"))
+IMAGE_CREDIT_COST = float(os.environ.get("IMAGE_CREDIT_COST", "1"))
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_DAYS = int(os.environ.get("JWT_EXPIRE_DAYS", "30"))
@@ -250,6 +251,7 @@ def user_public_dict(row: Dict[str, Any]) -> Dict[str, Any]:
 __all__ = [
     "NEW_USER_FREE_CREDITS",
     "VIDEO_CREDIT_COST",
+    "IMAGE_CREDIT_COST",
     "AUTH_SMS_DEBUG",
     "SMS_CODE_TTL_SECONDS",
     "hash_password",

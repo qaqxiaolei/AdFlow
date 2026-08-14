@@ -1,4 +1,29 @@
 export const PENDING_RECHARGE_ORDER_KEY = 'adflow_pending_recharge_order'
+export const WECHAT_OPENID_KEY = 'adflow_wechat_openid'
+export const PENDING_RECHARGE_PACKAGE_KEY = 'adflow_pending_recharge_package'
+
+export type WechatTradeType = 'jsapi' | 'native' | 'h5'
+
+export interface WechatJsapiPayParams {
+  appId: string
+  timeStamp: string
+  nonceStr: string
+  package: string
+  signType: string
+  paySign: string
+}
+
+declare global {
+  interface Window {
+    WeixinJSBridge?: {
+      invoke: (
+        method: string,
+        params: Record<string, string>,
+        callback: (res: { err_msg?: string }) => void
+      ) => void
+    }
+  }
+}
 
 export function isWechatBrowser(): boolean {
   if (typeof navigator === 'undefined') return false
@@ -16,9 +41,13 @@ export function isMobileDevice(): boolean {
   return byUa || byWidth || isWechatBrowser()
 }
 
-/** 手机端或微信内置浏览器走 H5 跳转；桌面浏览器走 Native 扫码 */
-export function getWechatTradeType(): 'h5' | 'native' {
-  return isMobileDevice() ? 'h5' : 'native'
+/**
+ * 微信内 → JSAPI；其它端 → Native 扫码。
+ * （H5 未开通时不再默认走 H5）
+ */
+export function getWechatTradeType(): WechatTradeType {
+  if (isWechatBrowser()) return 'jsapi'
+  return 'native'
 }
 
 export function savePendingRechargeOrder(orderId: string) {
@@ -45,21 +74,68 @@ export function clearPendingRechargeOrder() {
   }
 }
 
+export function savePendingRechargePackage(packageId: string) {
+  try {
+    sessionStorage.setItem(PENDING_RECHARGE_PACKAGE_KEY, packageId)
+  } catch {
+    // ignore
+  }
+}
+
+export function loadPendingRechargePackage(): string | null {
+  try {
+    return sessionStorage.getItem(PENDING_RECHARGE_PACKAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function clearPendingRechargePackage() {
+  try {
+    sessionStorage.removeItem(PENDING_RECHARGE_PACKAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+export function saveWechatOpenid(openid: string) {
+  try {
+    sessionStorage.setItem(WECHAT_OPENID_KEY, openid)
+  } catch {
+    // ignore
+  }
+}
+
+export function loadWechatOpenid(): string | null {
+  try {
+    return sessionStorage.getItem(WECHAT_OPENID_KEY)
+  } catch {
+    return null
+  }
+}
+
 export function hasWechatRechargeReturn(): boolean {
   if (typeof window === 'undefined') return false
   const params = new URLSearchParams(window.location.search)
   return (
     params.has('recharge_order') ||
     params.has('wechat_mock_pay') ||
+    params.has('wechat_openid') ||
+    params.has('open_recharge') ||
     Boolean(loadPendingRechargeOrder())
   )
 }
 
 export function clearRechargeQueryParams() {
   const params = new URLSearchParams(window.location.search)
-  ;['recharge_order', 'wechat_mock_pay', 'order_id'].forEach((key) =>
-    params.delete(key)
-  )
+  ;[
+    'recharge_order',
+    'wechat_mock_pay',
+    'order_id',
+    'wechat_openid',
+    'open_recharge',
+    'wechat_oauth_error',
+  ].forEach((key) => params.delete(key))
   const next = `${window.location.pathname}${
     params.toString() ? `?${params}` : ''
   }${window.location.hash}`
@@ -68,4 +144,53 @@ export function clearRechargeQueryParams() {
 
 export function buildRechargeRedirectUrl(): string {
   return `${window.location.origin}${window.location.pathname}${window.location.search}`
+}
+
+/** 跳转后端发起微信网页授权（静默拿 openid） */
+export function startWechatOAuth(returnUrl?: string) {
+  const target = returnUrl || buildRechargeRedirectUrl()
+  const url = `/api/billing/wechat/oauth/start?return_url=${encodeURIComponent(target)}`
+  window.location.href = url
+}
+
+export function invokeWechatJsapiPay(
+  params: WechatJsapiPayParams
+): Promise<'ok' | 'cancel' | 'fail'> {
+  return new Promise((resolve) => {
+    const doPay = () => {
+      const bridge = window.WeixinJSBridge
+      if (!bridge) {
+        resolve('fail')
+        return
+      }
+      bridge.invoke(
+        'getBrandWCPayRequest',
+        {
+          appId: params.appId,
+          timeStamp: params.timeStamp,
+          nonceStr: params.nonceStr,
+          package: params.package,
+          signType: params.signType,
+          paySign: params.paySign,
+        },
+        (res) => {
+          const msg = res?.err_msg || ''
+          if (msg === 'get_brand_wcpay_request:ok') resolve('ok')
+          else if (msg === 'get_brand_wcpay_request:cancel') resolve('cancel')
+          else resolve('fail')
+        }
+      )
+    }
+
+    if (typeof window.WeixinJSBridge === 'undefined') {
+      document.addEventListener('WeixinJSBridgeReady', doPay, false)
+      // 兜底：部分机型事件丢失
+      window.setTimeout(() => {
+        if (window.WeixinJSBridge) doPay()
+        else resolve('fail')
+      }, 2500)
+    } else {
+      doPay()
+    }
+  })
 }

@@ -2,17 +2,9 @@ import traceback
 from typing import Dict
 from langchain_core.tools import BaseTool
 from models.tool_model import ToolInfo
-from tools.comfy_dynamic import build_tool
 from tools.write_plan import write_plan_tool
-from tools.generate_image_by_imagen_4_replicate import (
-    generate_image_by_imagen_4_replicate,
-)
-from tools.generate_image_by_flux_kontext_pro_replicate import (
-    generate_image_by_flux_kontext_pro_replicate,
-)
-from tools.generate_image_by_flux_kontext_max_replicate import (
-    generate_image_by_flux_kontext_max_replicate,
-)
+from tools.generate_image_by_agnes import generate_image_by_agnes
+from tools.generate_video_by_agnes import generate_video_by_agnes
 from tools.generate_video_by_seedance_v1_pro_volces import (
     generate_video_by_seedance_v1_pro_volces,
 )
@@ -20,22 +12,18 @@ from tools.generate_video_by_seedance_v1_lite_volces import (
     generate_video_by_seedance_v1_lite_t2v,
     generate_video_by_seedance_v1_lite_i2v,
 )
-from tools.generate_image_by_recraft_v3_replicate import (
-    generate_image_by_recraft_v3_replicate,
-)
-from tools.generate_image_by_agnes import generate_image_by_agnes
-from tools.generate_video_by_agnes import generate_video_by_agnes
 from tools.search_video_by_platform import search_video_by_platform_tool
 from services.config_service import config_service
-from services.db_service import db_service
 
 TOOL_MAPPING: Dict[str, ToolInfo] = {
+    # 图像：仅保留 Agnes
     "generate_image_by_agnes": {
         "display_name": "Agnes Image",
         "type": "image",
         "provider": "agnes",
         "tool_function": generate_image_by_agnes,
     },
+    # 视频工具保持不变
     "generate_video_by_agnes": {
         "display_name": "Seedance 2.0",
         "type": "video",
@@ -59,30 +47,6 @@ TOOL_MAPPING: Dict[str, ToolInfo] = {
         "type": "video",
         "provider": "volces",
         "tool_function": generate_video_by_seedance_v1_lite_i2v,
-    },
-    "generate_image_by_imagen_4_replicate": {
-        "display_name": "Imagen 4",
-        "type": "image",
-        "provider": "replicate",
-        "tool_function": generate_image_by_imagen_4_replicate,
-    },
-    "generate_image_by_recraft_v3_replicate": {
-        "display_name": "Recraft v3",
-        "type": "image",
-        "provider": "replicate",
-        "tool_function": generate_image_by_recraft_v3_replicate,
-    },
-    "generate_image_by_flux_kontext_pro_replicate": {
-        "display_name": "Flux Kontext Pro",
-        "type": "image",
-        "provider": "replicate",
-        "tool_function": generate_image_by_flux_kontext_pro_replicate,
-    },
-    "generate_image_by_flux_kontext_max_replicate": {
-        "display_name": "Flux Kontext Max",
-        "type": "image",
-        "provider": "replicate",
-        "tool_function": generate_image_by_flux_kontext_max_replicate,
     },
     "search_video_by_platform": {
         "display_name": "Video Search",
@@ -132,8 +96,7 @@ class ToolService:
                     for tool_id, tool_info in TOOL_MAPPING.items():
                         if tool_info.get("provider") == provider_name:
                             self.register_tool(tool_id, tool_info)
-            if config_service.app_config.get("comfyui", {}).get("url", ""):
-                await register_comfy_tools()
+            # 生图仅使用 Agnes，不再注册 ComfyUI / Replicate 等其它图像工具
         except Exception as e:
             print(f"❌ Failed to initialize tool service: {e}")
             traceback.print_stack()
@@ -154,35 +117,3 @@ class ToolService:
 
 
 tool_service = ToolService()
-
-
-async def register_comfy_tools() -> Dict[str, BaseTool]:
-    dynamic_comfy_tools: Dict[str, BaseTool] = {}
-    try:
-        workflows = await db_service.list_comfy_workflows()
-    except Exception as exc:
-        print("[comfy_dynamic] Failed to list comfy workflows:", exc)
-        traceback.print_stack()
-        return {}
-
-    for wf in workflows:
-        try:
-            tool_fn = build_tool(wf)
-            unique_name = f"comfyui_{wf['name']}"
-            dynamic_comfy_tools[unique_name] = tool_fn
-            tool_service.register_tool(
-                unique_name,
-                {
-                    "provider": "comfyui",
-                    "tool_function": tool_fn,
-                    "display_name": wf["name"],
-                    "type": "image",
-                },
-            )
-        except Exception as exc:
-            print(
-                f"[comfy_dynamic] Failed to create tool for workflow {wf.get('id')}: {exc}"
-            )
-            print(traceback.print_stack())
-
-    return dynamic_comfy_tools

@@ -23,11 +23,19 @@ import { MobileBottomSheet } from '@/components/ui/mobile-bottom-sheet'
 import {
   buildRechargeRedirectUrl,
   clearPendingRechargeOrder,
+  clearPendingRechargePackage,
   clearRechargeQueryParams,
   getWechatTradeType,
+  invokeWechatJsapiPay,
   isMobileDevice,
+  isWechatBrowser,
   loadPendingRechargeOrder,
+  loadPendingRechargePackage,
+  loadWechatOpenid,
   savePendingRechargeOrder,
+  savePendingRechargePackage,
+  saveWechatOpenid,
+  startWechatOAuth,
 } from '@/lib/wechat-pay'
 import { cn } from '@/lib/utils'
 
@@ -50,10 +58,13 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
   const [order, setOrder] = useState<WechatOrderResponse | null>(null)
   const [mockMode, setMockMode] = useState(true)
 
-  const useH5Pay = isMobileDevice()
+  const inWechat = isWechatBrowser()
+  const tradeType = getWechatTradeType()
+  const useNativePay = tradeType === 'native'
 
   const finishPaid = async (credits: number) => {
     clearPendingRechargeOrder()
+    clearPendingRechargePackage()
     clearRechargeQueryParams()
     toast.success(
       t('common:auth.rechargeSuccess', {
@@ -76,7 +87,12 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
       .then((res) => {
         setPackages(res.packages)
         setMockMode(res.wechat_mock)
-        if (res.packages.length > 0) setSelected(res.packages[0].id)
+        const pendingPkg = loadPendingRechargePackage()
+        if (pendingPkg && res.packages.some((p) => p.id === pendingPkg)) {
+          setSelected(pendingPkg)
+        } else if (res.packages.length > 0) {
+          setSelected(res.packages[0].id)
+        }
         if (res.wechat_mock) {
           toast.message(t('common:auth.wechatMockHint'))
         } else if (!res.wechat_ready && res.wechat_missing.length > 0) {
@@ -91,11 +107,29 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
       .finally(() => setLoading(false))
   }, [open, t])
 
-  // 从微信支付页回跳后，恢复订单并确认到账
+  // OAuth 回跳：保存 openid；支付回跳：恢复订单
   useEffect(() => {
     if (!open || loading) return
 
     const params = new URLSearchParams(window.location.search)
+    const oauthError = params.get('wechat_oauth_error')
+    if (oauthError) {
+      toast.error(oauthError)
+      clearRechargeQueryParams()
+      return
+    }
+
+    const openidFromQuery = params.get('wechat_openid')
+    if (openidFromQuery) {
+      saveWechatOpenid(openidFromQuery)
+      clearRechargeQueryParams()
+      const pendingPkg = loadPendingRechargePackage()
+      if (pendingPkg) {
+        void handleCreateOrder(pendingPkg, openidFromQuery)
+      }
+      return
+    }
+
     const fromQuery =
       params.get('recharge_order') || params.get('order_id') || ''
     const pendingId = fromQuery || loadPendingRechargeOrder()
@@ -163,21 +197,75 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, step, order?.order_id])
 
-  const handleCreateOrder = async () => {
-    if (!selected) return
+  const handleCreateOrder = async (
+    packageId?: string,
+    openidOverride?: string
+  ) => {
+    const pkgId = packageId || selected
+    if (!pkgId) return
     setSubmitting(true)
     try {
-      const tradeType = getWechatTradeType()
-      const created = await createWechatRechargeOrder(selected, {
-        tradeType,
+      const currentTradeType = getWechatTradeType()
+
+      if (currentTradeType === 'jsapi') {
+        if (!isWechatBrowser()) {
+          toast.error(t('common:auth.wechatJsapiNeedWechat'))
+          return
+        }
+        const openid = openidOverride || loadWechatOpenid()
+        if (!openid) {
+          savePendingRechargePackage(pkgId)
+          startWechatOAuth(buildRechargeRedirectUrl())
+          return
+        }
+
+        const created = await createWechatRechargeOrder(pkgId, {
+          tradeType: 'jsapi',
+          openid,
+        })
+        savePendingRechargeOrder(created.order_id)
+        clearPendingRechargePackage()
+        setOrder(created)
+        setStep('pay')
+
+        if (created.mock) {
+          // 模拟模式：直接确认到账
+          const result = await mockConfirmWechatPay(created.order_id)
+          toast.success(result.message)
+          clearPendingRechargeOrder()
+          await queryClient.invalidateQueries({ queryKey: ['balance'] })
+          onOpenChange(false)
+          return
+        }
+
+        if (!created.jsapi_params) {
+          throw new Error(t('common:auth.rechargeFailed'))
+        }
+
+        const payResult = await invokeWechatJsapiPay(created.jsapi_params)
+        if (payResult === 'ok') {
+          // 等待回调轮询到账
+          toast.message(t('common:auth.wechatWaiting'))
+        } else if (payResult === 'cancel') {
+          toast.message(t('common:auth.wechatPayCancelled'))
+        } else {
+          toast.error(t('common:auth.wechatPayFailed'))
+        }
+        return
+      }
+
+      // Native / H5
+      const created = await createWechatRechargeOrder(pkgId, {
+        tradeType: currentTradeType,
         redirectUrl:
-          tradeType === 'h5' ? buildRechargeRedirectUrl() : undefined,
+          currentTradeType === 'h5' ? buildRechargeRedirectUrl() : undefined,
       })
 
       savePendingRechargeOrder(created.order_id)
 
-      const payUrl = created.h5_url || (tradeType === 'h5' ? created.code_url : '')
-      if (tradeType === 'h5' && payUrl) {
+      const payUrl =
+        created.h5_url || (currentTradeType === 'h5' ? created.code_url : '')
+      if (currentTradeType === 'h5' && payUrl) {
         window.location.href = payUrl
         return
       }
@@ -211,10 +299,28 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
     }
   }
 
-  const handleOpenWechatAgain = () => {
-    const url = order?.h5_url || order?.code_url
-    if (url) window.location.href = url
+  const handleRetryJsapi = async () => {
+    if (!order?.jsapi_params) return
+    setSubmitting(true)
+    try {
+      const payResult = await invokeWechatJsapiPay(order.jsapi_params)
+      if (payResult === 'ok') {
+        toast.message(t('common:auth.wechatWaiting'))
+      } else if (payResult === 'cancel') {
+        toast.message(t('common:auth.wechatPayCancelled'))
+      } else {
+        toast.error(t('common:auth.wechatPayFailed'))
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
+
+  const payHint = inWechat
+    ? t('common:auth.wechatJsapiHint')
+    : isMobileDevice()
+      ? t('common:auth.wechatOpenInWechatHint')
+      : t('common:auth.wechatScanHint')
 
   const body = (
     <>
@@ -228,6 +334,11 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
           >
             {t('common:auth.rechargeDescription')}
           </p>
+          {!inWechat ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+              {t('common:auth.wechatOpenInWechatHint')}
+            </p>
+          ) : null}
 
           {loading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
@@ -263,7 +374,7 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
           <Button
             className={cn('w-full touch-manipulation', isMobile && 'h-11')}
             disabled={!selected || submitting || loading}
-            onClick={handleCreateOrder}
+            onClick={() => handleCreateOrder()}
           >
             {submitting
               ? t('common:auth.submitting')
@@ -272,12 +383,8 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
         </>
       ) : (
         <div className="flex flex-col items-center gap-3">
-          <p className="text-sm text-muted-foreground text-center">
-            {useH5Pay
-              ? t('common:auth.wechatH5Hint')
-              : t('common:auth.wechatScanHint')}
-          </p>
-          {!useH5Pay && order?.qr_image ? (
+          <p className="text-sm text-muted-foreground text-center">{payHint}</p>
+          {useNativePay && order?.qr_image ? (
             <img
               src={order.qr_image}
               alt="WeChat Pay QR"
@@ -309,11 +416,12 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
             >
               {t('common:auth.cancel')}
             </Button>
-            {useH5Pay && (order?.h5_url || order?.code_url) ? (
+            {order?.trade_type === 'jsapi' && order.jsapi_params ? (
               <Button
                 type="button"
                 className={cn('flex-1', isMobile && 'h-11')}
-                onClick={handleOpenWechatAgain}
+                disabled={submitting}
+                onClick={handleRetryJsapi}
               >
                 {t('common:auth.wechatOpenAgain')}
               </Button>

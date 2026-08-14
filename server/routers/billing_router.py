@@ -1,20 +1,26 @@
-"""本地积分余额与微信支付充值（H5 跳转 / Native 扫码）。"""
+"""本地积分余额与微信支付充值（JSAPI / Native / H5）。"""
 
 from __future__ import annotations
 
+import base64
 import logging
 from typing import Dict, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import nanoid
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from routers.auth_router import get_current_user_id
 from services.db_service import db_service
 from services.wechat_pay_service import (
+    WECHAT_NOTIFY_URL,
+    build_oauth_authorize_url,
     create_h5_payment,
+    create_jsapi_payment,
     create_native_payment,
+    exchange_oauth_code_for_openid,
     has_wechat_credentials,
     is_wechat_mock_mode,
     missing_wechat_credentials,
@@ -29,16 +35,19 @@ RECHARGE_PACKAGES: List[Dict] = [
     {"id": "pack_50", "credits": 50, "price_cny": 5, "label": "体验包"},
     {"id": "pack_100", "credits": 100, "price_cny": 9, "label": "基础包"},
     {"id": "pack_300", "credits": 300, "price_cny": 25, "label": "进阶包"},
-    {"id": "pack_1000", "credits": 1000, "price_cny": 79, "label": "专业包"},
+    {"id": "pack_1000", "credits": 980, "price_cny": 79, "label": "专业包"},
 ]
 
 
 class CreateWechatOrderRequest(BaseModel):
     package_id: str = Field(..., description="充值套餐 ID")
-    # h5: 手机浏览器跳转微信支付；native: 桌面扫码
-    trade_type: str = Field(default="h5", description="h5 | native")
+    # jsapi: 微信内；native: 桌面扫码；h5: 手机浏览器（需已开通）
+    trade_type: str = Field(default="jsapi", description="jsapi | native | h5")
     redirect_url: Optional[str] = Field(
         default=None, description="H5 支付完成后回跳地址"
+    )
+    openid: Optional[str] = Field(
+        default=None, description="JSAPI 所需微信 openid"
     )
 
 
@@ -56,6 +65,115 @@ def _client_ip(request: Request) -> str:
     if request.client:
         return request.client.host
     return "127.0.0.1"
+
+
+def _public_origin(request: Request) -> str:
+    proto = (
+        request.headers.get("x-forwarded-proto")
+        or request.url.scheme
+        or "https"
+    ).split(",")[0].strip()
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or request.url.netloc
+    )
+    return f"{proto}://{host}"
+
+
+def _oauth_public_origin(request: Request) -> str:
+    """OAuth 回调必须用已配置的公网域名（微信不认局域网 IP）。"""
+    if WECHAT_NOTIFY_URL:
+        parsed = urlparse(WECHAT_NOTIFY_URL)
+        if parsed.scheme and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+    return _public_origin(request)
+
+
+def _host_only(netloc: str) -> str:
+    return (netloc or "").split("@")[-1].split(":")[0].lower()
+
+
+def _is_private_host(host: str) -> bool:
+    h = (host or "").lower()
+    return (
+        h in ("localhost", "127.0.0.1", "::1")
+        or h.startswith("192.168.")
+        or h.startswith("10.")
+        or h.startswith("172.16.")
+        or h.startswith("172.17.")
+        or h.startswith("172.18.")
+        or h.startswith("172.19.")
+        or h.startswith("172.2")
+        or h.startswith("172.30.")
+        or h.startswith("172.31.")
+    )
+
+
+def _encode_return_state(return_url: str) -> str:
+    return base64.urlsafe_b64encode(return_url.encode("utf-8")).decode("ascii")
+
+
+def _decode_return_state(state: str) -> str:
+    try:
+        raw = base64.urlsafe_b64decode(state.encode("ascii")).decode("utf-8")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="无效的 OAuth state") from exc
+    return raw
+
+
+def _allowed_hosts(request: Request) -> set[str]:
+    hosts: set[str] = set()
+    for candidate in (
+        _public_origin(request),
+        _oauth_public_origin(request),
+        request.headers.get("origin") or "",
+        request.headers.get("referer") or "",
+    ):
+        if not candidate:
+            continue
+        parsed = urlparse(candidate if "://" in candidate else f"https://{candidate}")
+        host = _host_only(parsed.netloc)
+        if host:
+            hosts.add(host)
+    return hosts
+
+
+def _safe_return_url(return_url: str, request: Request) -> str:
+    """仅允许跳回本站，防止开放重定向。"""
+    origin = _oauth_public_origin(request)
+    parsed = urlparse(return_url)
+    if not parsed.scheme and not parsed.netloc:
+        path = return_url if return_url.startswith("/") else f"/{return_url}"
+        return f"{origin}{path}"
+
+    host = _host_only(parsed.netloc)
+    if _is_private_host(host):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "JSAPI 不支持用局域网 IP 授权。请用微信打开 https://adflow.chat 再充值"
+            ),
+        )
+
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="return_url 无效")
+
+    allowed = _allowed_hosts(request)
+    if host in allowed or _host_only(urlparse(origin).netloc) == host:
+        return return_url
+
+    raise HTTPException(
+        status_code=400,
+        detail="return_url 必须是本站地址，请使用 https://adflow.chat",
+    )
+
+
+def _append_query(url: str, **params: str) -> str:
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query.update({k: v for k, v in params.items() if v is not None})
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 @router.get("/getBalance")
@@ -76,6 +194,41 @@ async def list_packages():
     }
 
 
+@router.get("/wechat/oauth/start")
+async def wechat_oauth_start(
+    request: Request,
+    return_url: str = Query(..., description="授权完成后回跳的前端地址"),
+):
+    """跳转微信网页授权，静默获取 openid（需在微信内打开）。"""
+    safe_return = _safe_return_url(return_url, request)
+    callback = f"{_oauth_public_origin(request)}/api/billing/wechat/oauth/callback"
+    state = _encode_return_state(safe_return)
+    try:
+        auth_url = build_oauth_authorize_url(callback, state=state)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    return RedirectResponse(auth_url, status_code=302)
+
+
+@router.get("/wechat/oauth/callback")
+async def wechat_oauth_callback(
+    request: Request,
+    code: str = Query(default=""),
+    state: str = Query(default=""),
+):
+    """微信 OAuth 回调：换 openid 后带回前端。"""
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="缺少 code 或 state")
+    return_url = _safe_return_url(_decode_return_state(state), request)
+    try:
+        openid = exchange_oauth_code_for_openid(code)
+    except RuntimeError as e:
+        fail_url = _append_query(return_url, wechat_oauth_error=str(e)[:120])
+        return RedirectResponse(fail_url, status_code=302)
+    ok_url = _append_query(return_url, wechat_openid=openid, open_recharge="1")
+    return RedirectResponse(ok_url, status_code=302)
+
+
 @router.post("/wechat/create-order")
 async def create_wechat_order(
     body: CreateWechatOrderRequest,
@@ -83,9 +236,11 @@ async def create_wechat_order(
     user_id: str = Depends(get_current_user_id),
 ):
     package = _get_package(body.package_id)
-    trade_type = (body.trade_type or "h5").lower().strip()
-    if trade_type not in ("h5", "native"):
-        raise HTTPException(status_code=400, detail="trade_type 仅支持 h5 或 native")
+    trade_type = (body.trade_type or "jsapi").lower().strip()
+    if trade_type not in ("jsapi", "native", "h5"):
+        raise HTTPException(
+            status_code=400, detail="trade_type 仅支持 jsapi、native 或 h5"
+        )
 
     order_id = nanoid.generate(size=16)
     amount_cents = int(round(float(package["price_cny"]) * 100))
@@ -94,6 +249,7 @@ async def create_wechat_order(
     code_url = ""
     qr_image = ""
     h5_url = ""
+    jsapi_params: Dict[str, str] = {}
     is_mock = is_wechat_mock_mode()
 
     redirect_url = body.redirect_url
@@ -102,7 +258,14 @@ async def create_wechat_order(
         redirect_url = f"{redirect_url}{sep}recharge_order={order_id}"
 
     try:
-        if trade_type == "h5":
+        if trade_type == "jsapi":
+            jsapi_params, is_mock = create_jsapi_payment(
+                order_id=order_id,
+                amount_cents=amount_cents,
+                description=description,
+                openid=body.openid or "",
+            )
+        elif trade_type == "h5":
             h5_url, is_mock = create_h5_payment(
                 order_id=order_id,
                 amount_cents=amount_cents,
@@ -129,9 +292,15 @@ async def create_wechat_order(
         package_id=package["id"],
         credits=float(package["credits"]),
         amount_cents=amount_cents,
-        code_url=code_url,
+        code_url=code_url or (jsapi_params.get("package") or ""),
         channel="wechat",
     )
+
+    messages = {
+        "jsapi": "请在微信中完成支付",
+        "h5": "请完成微信支付",
+        "native": "请使用微信扫码支付",
+    }
 
     return {
         "status": "pending",
@@ -143,12 +312,9 @@ async def create_wechat_order(
         "qr_image": qr_image,
         "code_url": code_url,
         "h5_url": h5_url,
+        "jsapi_params": jsapi_params or None,
         "mock": is_mock,
-        "message": (
-            "请完成微信支付"
-            if trade_type == "h5"
-            else "请使用微信扫码支付"
-        ),
+        "message": messages.get(trade_type, "请完成微信支付"),
     }
 
 

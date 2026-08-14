@@ -1,4 +1,5 @@
 import { authenticatedFetch } from './auth'
+import type { WechatJsapiPayParams, WechatTradeType } from '@/lib/wechat-pay'
 
 export interface BalanceResponse {
   balance: string
@@ -17,10 +18,11 @@ export interface WechatOrderResponse {
   credits: number
   price_cny: number
   amount_cents: number
-  trade_type?: 'h5' | 'native' | string
+  trade_type?: WechatTradeType | string
   qr_image: string
   code_url: string
   h5_url?: string
+  jsapi_params?: WechatJsapiPayParams | null
   mock: boolean
   message?: string
 }
@@ -66,16 +68,18 @@ export async function getRechargePackages(): Promise<{
 export async function createWechatRechargeOrder(
   packageId: string,
   options?: {
-    tradeType?: 'h5' | 'native'
+    tradeType?: WechatTradeType
     redirectUrl?: string
+    openid?: string
   }
 ): Promise<WechatOrderResponse> {
   const response = await authenticatedFetch('/api/billing/wechat/create-order', {
     method: 'POST',
     body: JSON.stringify({
       package_id: packageId,
-      trade_type: options?.tradeType ?? 'h5',
+      trade_type: options?.tradeType ?? 'jsapi',
       redirect_url: options?.redirectUrl,
+      openid: options?.openid,
     }),
   })
   const data = await response.json().catch(() => ({}))

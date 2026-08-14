@@ -1,4 +1,4 @@
-"""微信支付：H5 跳转支付 + Native 扫码，支持模拟模式。"""
+"""微信支付：JSAPI（微信内）+ Native 扫码 + H5，支持模拟模式。"""
 
 from __future__ import annotations
 
@@ -7,10 +7,14 @@ import io
 import json
 import logging
 import os
+import time
+import uuid
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +56,8 @@ def _env(*names: str, default: str = "") -> str:
 WECHAT_PAY_MOCK = _env("WECHAT_PAY_MOCK", default="1") == "1"
 WECHAT_MCH_ID = _env("WECHAT_MCH_ID")
 WECHAT_APP_ID = _env("WECHAT_APP_ID", "WECHAT_APPID")
+# 公众号 AppSecret，JSAPI 网页授权换 openid 需要
+WECHAT_APP_SECRET = _env("WECHAT_APP_SECRET", "WECHAT_SECRET")
 WECHAT_API_V3_KEY = _env("WECHAT_API_V3_KEY", "WECHAT_APIV3_KEY")
 WECHAT_CERT_SERIAL_NO = _env("WECHAT_CERT_SERIAL_NO")
 WECHAT_PRIVATE_KEY_PATH = _env(
@@ -99,6 +105,8 @@ def missing_wechat_credentials() -> list[str]:
         missing.append("WECHAT_MCH_ID")
     if not WECHAT_APP_ID:
         missing.append("WECHAT_APP_ID")
+    if not WECHAT_APP_SECRET:
+        missing.append("WECHAT_APP_SECRET（JSAPI 网页授权换 openid 需要）")
     if not WECHAT_API_V3_KEY:
         missing.append("WECHAT_API_V3_KEY")
     if not WECHAT_CERT_SERIAL_NO:
@@ -118,6 +126,50 @@ def missing_wechat_credentials() -> list[str]:
     if public_key and not WECHAT_PUBLIC_KEY_ID:
         missing.append("WECHAT_PUBLIC_KEY_ID")
     return missing
+
+
+def build_oauth_authorize_url(redirect_uri: str, state: str = "adflow") -> str:
+    """构造微信网页授权 URL（snsapi_base，静默获取 openid）。"""
+    if not WECHAT_APP_ID:
+        raise RuntimeError("未配置 WECHAT_APP_ID")
+    query = urlencode(
+        {
+            "appid": WECHAT_APP_ID,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "snsapi_base",
+            "state": state,
+        }
+    )
+    return f"https://open.weixin.qq.com/connect/oauth2/authorize?{query}#wechat_redirect"
+
+
+def exchange_oauth_code_for_openid(code: str) -> str:
+    """用网页授权 code 换取用户 openid。"""
+    if is_wechat_mock_mode():
+        return f"mock_openid_{code[:8] or 'demo'}"
+    if not WECHAT_APP_ID or not WECHAT_APP_SECRET:
+        raise RuntimeError("未配置 WECHAT_APP_ID / WECHAT_APP_SECRET，无法换取 openid")
+    url = "https://api.weixin.qq.com/sns/oauth2/access_token"
+    params = {
+        "appid": WECHAT_APP_ID,
+        "secret": WECHAT_APP_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+    }
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.get(url, params=params)
+            data = resp.json()
+    except Exception as exc:
+        logger.exception("exchange wechat oauth code failed")
+        raise RuntimeError(f"换取微信 openid 失败: {exc}") from exc
+
+    openid = (data or {}).get("openid") or ""
+    if not openid:
+        err = (data or {}).get("errmsg") or json.dumps(data, ensure_ascii=False)
+        raise RuntimeError(f"换取微信 openid 失败: {err}")
+    return openid
 
 
 def has_wechat_credentials() -> bool:
@@ -277,6 +329,64 @@ def create_h5_payment(
         h5_url = f"{h5_url}{joiner}redirect_url={quote(redirect_url, safe='')}"
 
     return h5_url, False
+
+
+def create_jsapi_payment(
+    order_id: str,
+    amount_cents: int,
+    description: str,
+    openid: str,
+) -> Tuple[Dict[str, str], bool]:
+    """
+    JSAPI 支付（仅微信内置浏览器）。
+    Returns: (jsapi_pay_params, is_mock)
+    """
+    openid = (openid or "").strip()
+    if not openid:
+        raise RuntimeError("JSAPI 支付缺少 openid，请先完成微信网页授权")
+
+    if is_wechat_mock_mode():
+        return {
+            "appId": WECHAT_APP_ID or "wx_mock",
+            "timeStamp": str(int(time.time())),
+            "nonceStr": uuid.uuid4().hex,
+            "package": f"prepay_id=mock_{order_id}",
+            "signType": "RSA",
+            "paySign": "MOCK_SIGN",
+        }, True
+
+    require_wechat_ready()
+    from wechatpayv3 import WeChatPayType
+
+    wxpay = _get_wxpay()
+    code, message = wxpay.pay(
+        description=description[:127],
+        out_trade_no=order_id,
+        amount={"total": amount_cents, "currency": "CNY"},
+        pay_type=WeChatPayType.JSAPI,
+        payer={"openid": openid},
+    )
+    if code not in (200, 204):
+        logger.error("WeChat JSAPI pay failed: %s %s", code, message)
+        raise RuntimeError(f"微信 JSAPI 下单失败: {message}")
+
+    data = json.loads(message) if isinstance(message, str) else message
+    prepay_id = data.get("prepay_id") or ""
+    if not prepay_id:
+        raise RuntimeError(f"微信下单未返回 prepay_id: {message}")
+
+    timestamp = str(int(time.time()))
+    nonce_str = uuid.uuid4().hex
+    package = f"prepay_id={prepay_id}"
+    pay_sign = wxpay.sign([WECHAT_APP_ID, timestamp, nonce_str, package])
+    return {
+        "appId": WECHAT_APP_ID,
+        "timeStamp": timestamp,
+        "nonceStr": nonce_str,
+        "package": package,
+        "signType": "RSA",
+        "paySign": pay_sign,
+    }, False
 
 
 def parse_notify(headers: Dict[str, Any], body: bytes) -> Optional[Dict[str, Any]]:

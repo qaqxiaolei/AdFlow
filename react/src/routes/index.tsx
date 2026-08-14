@@ -147,22 +147,22 @@ function Home() {
 
           <TopMenu />
 
-          <div className="relative z-20 flex flex-col items-center justify-center h-fit min-h-[42vh] sm:min-h-[calc(100vh-420px)] pt-8 sm:pt-[60px] px-4 w-full pb-8">
+          <div className="relative z-20 flex flex-col items-center justify-center h-fit min-h-0 sm:min-h-[calc(100vh-420px)] pt-6 sm:pt-[60px] px-4 w-full pb-4 sm:pb-8">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: -36 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 mt-4 sm:mt-8 text-center text-white drop-shadow-sm">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 mt-2 sm:mt-8 text-center text-white drop-shadow-sm">
                 {t('home:title')}
               </h1>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: -36 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8 text-center px-2">
+              <p className="text-base sm:text-xl text-white/90 mb-4 sm:mb-8 text-center px-2">
                 {generationMode === 'image'
                   ? t('home:subtitleImage')
                   : t('home:subtitleVideo')}
@@ -170,7 +170,7 @@ function Home() {
             </motion.div>
 
             <ChatTextarea
-              className="w-full max-w-xl -mb-10 translate-y-11 sm:translate-y-12"
+              className="w-full max-w-xl relative z-20 translate-y-0 mb-0 sm:-mb-10 sm:translate-y-12"
               autoSize={{ minRows: 2, maxRows: 8 }}
               messages={[]}
               onSendMessages={(messages, configs) => {
@@ -192,7 +192,7 @@ function Home() {
         </div>
 
         {/* 下方：最近项目 + 吉祥物水印背景（黑底图用 blend/mask 弱化，不抢卡片） */}
-        <div className="relative z-10 min-h-[50vh] sm:min-h-[55vh] overflow-hidden bg-background">
+        <div className="relative z-0 sm:z-10 min-h-[50vh] sm:min-h-[55vh] overflow-hidden bg-background pt-6 sm:pt-10">
           <div
             className="pointer-events-none absolute inset-0 flex items-center justify-center home-projects-mascot"
             aria-hidden

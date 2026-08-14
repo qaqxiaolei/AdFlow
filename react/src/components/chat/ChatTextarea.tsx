@@ -197,8 +197,16 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       openAuthDialog()
       return
     }
-    // 登录用户积分不足时拦截（视频生成会扣积分）
-    if (generationMode === 'video' && parseFloat(balance) <= 0) {
+    // 登录用户积分不足时拦截（视频 / 图片都会扣积分）
+    const balanceNum = parseFloat(balance)
+    if (generationMode === 'video' && balanceNum <= 0) {
+      toast.error(t('chat:insufficientBalance'), {
+        description: <RechargeContent />,
+        duration: 10000,
+      })
+      return
+    }
+    if (generationMode === 'image' && balanceNum < quantity) {
       toast.error(t('chat:insufficientBalance'), {
         description: <RechargeContent />,
         duration: 10000,
@@ -532,7 +540,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-wrap">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 flex-nowrap overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div
             className="inline-flex h-8 shrink-0 items-center rounded-lg border border-border bg-muted/60 p-0.5"
             role="tablist"
@@ -587,7 +595,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
             <PlusIcon className="size-4" />
           </Button>
 
-          <ModelSelectorV3 />
+          {!isMobile && <ModelSelectorV3 />}
 
           {/* Aspect Ratio Selector */}
           {isMobile ? (
