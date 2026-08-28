@@ -4,7 +4,6 @@ Contains the main orchestration logic for image generation across different prov
 """
 
 from typing import Optional, Dict, Any
-from common import DEFAULT_PORT
 from tools.utils.image_utils import process_input_image
 from ..image_providers.image_base_provider import ImageProviderBase
 
@@ -19,6 +18,8 @@ from ..image_providers.wavespeed_provider import WavespeedProvider
 from .image_canvas_utils import (
     save_image_to_canvas,
 )
+from .image_prompt_utils import enhance_image_prompt
+
 
 IMAGE_PROVIDERS: dict[str, ImageProviderBase] = {
     "agnes": AgnesImageProvider(),
@@ -60,9 +61,14 @@ async def generate_image_with_provider(
 
         print(f"Using {len(processed_input_images)} input images for generation")
 
+    enhanced_prompt = enhance_image_prompt(prompt)
+    if enhanced_prompt != (prompt or "").strip():
+        print("🖼️ [ImagePrompt] applied promotional/scene constraints")
+
     # Prepare metadata with all generation parameters
     metadata: Dict[str, Any] = {
-        "prompt": prompt,
+        "prompt": enhanced_prompt,
+        "original_prompt": prompt,
         "model": model,
         "provider": provider,
         "aspect_ratio": aspect_ratio,
@@ -85,7 +91,7 @@ async def generate_image_with_provider(
 
         # Generate image using the selected provider
         mime_type, width, height, filename = await provider_instance.generate(
-            prompt=prompt,
+            prompt=enhanced_prompt,
             model=model,
             aspect_ratio=aspect_ratio,
             input_images=processed_input_images,
@@ -99,7 +105,7 @@ async def generate_image_with_provider(
 
         return (
             f"image generated successfully "
-            f"![image_id: {filename}](http://localhost:{DEFAULT_PORT}{image_url})"
+            f"![image_id: {filename}]({image_url})"
         )
     except Exception:
         if credits_deducted and user_id:

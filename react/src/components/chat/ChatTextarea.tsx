@@ -68,7 +68,22 @@ const toolbarIconButtonClass =
 const toolbarChipButtonClass =
   'touch-manipulation h-8 shrink-0 px-2 gap-0.5 whitespace-nowrap'
 
-const ASPECT_RATIOS = ['auto', '1:1', '4:3', '3:4', '16:9', '9:16'] as const
+const IMAGE_ASPECT_RATIOS = [
+  'auto',
+  '1:1',
+  '4:3',
+  '3:4',
+  '16:9',
+  '9:16',
+] as const
+/** 生视频不含 3:4 / 3:2 */
+const VIDEO_ASPECT_RATIOS = [
+  'auto',
+  '1:1',
+  '4:3',
+  '16:9',
+  '9:16',
+] as const
 
 function isInteractiveTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false
@@ -108,7 +123,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>(() =>
     generationMode === 'image' ? '1:1' : '9:16'
   )
-  const [quantity, setQuantity] = useState<number>(2)
+  const [quantity, setQuantity] = useState<number>(1)
   const [showQuantitySlider, setShowQuantitySlider] = useState(false)
   const [showAspectRatioPicker, setShowAspectRatioPicker] = useState(false)
   const [showRechargeDialog, setShowRechargeDialog] = useState(false)
@@ -179,6 +194,8 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const modeTools = (selectedTools || []).filter(
     (tool) => tool.type === generationMode
   )
+  const aspectRatios =
+    generationMode === 'image' ? IMAGE_ASPECT_RATIOS : VIDEO_ASPECT_RATIOS
 
   const handleGenerationModeChange = useCallback(
     (mode: GenerationMode) => {
@@ -189,6 +206,16 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     },
     [generationMode, setGenerationMode]
   )
+
+  // 生视频不支持 3:4 / 3:2：若当前仍选着无效比例，自动切回默认竖屏
+  useEffect(() => {
+    if (
+      generationMode === 'video' &&
+      (selectedAspectRatio === '3:4' || selectedAspectRatio === '3:2')
+    ) {
+      setSelectedAspectRatio('9:16')
+    }
+  }, [generationMode, selectedAspectRatio])
 
   // Send Prompt
   const handleSendPrompt = useCallback(async () => {
@@ -623,7 +650,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-32">
-                {ASPECT_RATIOS.map((ratio) => (
+                {aspectRatios.map((ratio) => (
                   <DropdownMenuItem
                     key={ratio}
                     onSelect={() => setSelectedAspectRatio(ratio)}
@@ -716,7 +743,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
             title={t('chat:textarea.aspectRatio', '生成比例')}
           >
             <div className="grid grid-cols-3 gap-2.5 pb-1">
-              {ASPECT_RATIOS.map((ratio) => (
+              {aspectRatios.map((ratio) => (
                 <Button
                   key={ratio}
                   type="button"

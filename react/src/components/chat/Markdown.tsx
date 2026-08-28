@@ -203,11 +203,12 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
             }
 
             return (
-                <PhotoView src={props.src}>
+                <PhotoView src={normalizedSrc || props.src}>
                     <span className="group block relative overflow-hidden rounded-md my-2 last:mb-4">
                         <img
                             className="cursor-pointer group-hover:scale-105 transition-transform duration-300"
                             {...props}
+                            src={normalizedSrc || props.src}
                         />
                     </span>
                 </PhotoView>

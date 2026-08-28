@@ -25,6 +25,7 @@ import {
   clearPendingRechargeOrder,
   clearPendingRechargePackage,
   clearRechargeQueryParams,
+  dismissWechatRechargeReturn,
   getWechatTradeType,
   invokeWechatJsapiPay,
   isMobileDevice,
@@ -62,10 +63,16 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
   const tradeType = getWechatTradeType()
   const useNativePay = tradeType === 'native'
 
+  const handleOpenChange = (next: boolean) => {
+    if (!next) {
+      // 关掉弹窗时清掉待支付回跳标记，否则点「最近项目」等导致重挂载又会自动打开
+      dismissWechatRechargeReturn()
+    }
+    onOpenChange(next)
+  }
+
   const finishPaid = async (credits: number) => {
-    clearPendingRechargeOrder()
-    clearPendingRechargePackage()
-    clearRechargeQueryParams()
+    dismissWechatRechargeReturn()
     toast.success(
       t('common:auth.rechargeSuccess', {
         credits,
@@ -234,7 +241,7 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
           toast.success(result.message)
           clearPendingRechargeOrder()
           await queryClient.invalidateQueries({ queryKey: ['balance'] })
-          onOpenChange(false)
+          handleOpenChange(false)
           return
         }
 
@@ -289,7 +296,7 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
       toast.success(result.message)
       clearPendingRechargeOrder()
       await queryClient.invalidateQueries({ queryKey: ['balance'] })
-      onOpenChange(false)
+      handleOpenChange(false)
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : t('common:auth.rechargeFailed')
@@ -326,16 +333,27 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
     <>
       {step === 'select' ? (
         <>
-          <p
-            className={cn(
-              'text-muted-foreground',
-              isMobile ? 'text-xs leading-relaxed mb-3' : 'text-sm mb-0'
-            )}
-          >
-            {t('common:auth.rechargeDescription')}
-          </p>
+          <div className={cn(isMobile ? 'mb-3' : 'mb-3')}>
+            <p
+              className={cn(
+                'font-medium text-foreground/90 leading-relaxed',
+                isMobile ? 'text-xs' : 'text-sm'
+              )}
+            >
+              {t('common:auth.rechargeDescription')}
+            </p>
+            <div
+              className={cn(
+                'mt-1.5 space-y-0.5 text-muted-foreground',
+                isMobile ? 'text-[11px] leading-relaxed' : 'text-xs'
+              )}
+            >
+              <p>{t('common:auth.rechargeCostImage')}</p>
+              <p>{t('common:auth.rechargeCostVideo')}</p>
+            </div>
+          </div>
           {!inWechat ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+            <p className="text-[11px] leading-snug text-amber-600/90 dark:text-amber-400/90 mb-3">
               {t('common:auth.wechatOpenInWechatHint')}
             </p>
           ) : null}
@@ -352,20 +370,22 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
                   type="button"
                   onClick={() => setSelected(pkg.id)}
                   className={cn(
-                    'flex items-center justify-between rounded-md border px-4 text-left transition-colors touch-manipulation',
+                    'flex items-center justify-between rounded-xl border px-4 text-left transition-colors touch-manipulation',
                     isMobile ? 'min-h-14 py-3.5' : 'py-3',
                     selected === pkg.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:bg-muted/50'
+                      ? 'border-primary bg-primary/5 shadow-sm'
+                      : 'border-border/80 bg-transparent hover:bg-muted/40'
                   )}
                 >
-                  <div>
-                    <div className="font-medium">{pkg.label}</div>
-                    <div className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <div className="font-medium leading-tight">{pkg.label}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
                       {pkg.credits} {t('common:auth.credits')}
                     </div>
                   </div>
-                  <div className="text-sm font-semibold">¥{pkg.price_cny}</div>
+                  <div className="text-base font-semibold tabular-nums tracking-tight">
+                    ¥{pkg.price_cny}
+                  </div>
                 </button>
               ))}
             </div>
@@ -448,7 +468,7 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
     return (
       <MobileBottomSheet
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={handleOpenChange}
         title={t('common:auth.recharge')}
         className="max-h-[90dvh]"
         contentClassName="overflow-y-auto overscroll-contain max-h-[calc(90dvh-3.5rem)]"
@@ -459,7 +479,7 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('common:auth.recharge')}</DialogTitle>

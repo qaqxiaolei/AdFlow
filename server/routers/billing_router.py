@@ -32,10 +32,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 RECHARGE_PACKAGES: List[Dict] = [
-    {"id": "pack_50", "credits": 50, "price_cny": 5, "label": "体验包"},
-    {"id": "pack_100", "credits": 100, "price_cny": 9, "label": "基础包"},
-    {"id": "pack_300", "credits": 300, "price_cny": 25, "label": "进阶包"},
-    {"id": "pack_1000", "credits": 980, "price_cny": 79, "label": "专业包"},
+    {"id": "pack_100", "credits": 180, "price_cny": 19, "label": "基础包"},
+    {"id": "pack_300", "credits": 680, "price_cny": 59, "label": "进阶包"},
+    {"id": "pack_1000", "credits": 1200, "price_cny": 99, "label": "专业包"},
 ]
 
 

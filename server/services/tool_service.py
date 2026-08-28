@@ -5,13 +5,6 @@ from models.tool_model import ToolInfo
 from tools.write_plan import write_plan_tool
 from tools.generate_image_by_agnes import generate_image_by_agnes
 from tools.generate_video_by_agnes import generate_video_by_agnes
-from tools.generate_video_by_seedance_v1_pro_volces import (
-    generate_video_by_seedance_v1_pro_volces,
-)
-from tools.generate_video_by_seedance_v1_lite_volces import (
-    generate_video_by_seedance_v1_lite_t2v,
-    generate_video_by_seedance_v1_lite_i2v,
-)
 from tools.search_video_by_platform import search_video_by_platform_tool
 from services.config_service import config_service
 
@@ -23,30 +16,12 @@ TOOL_MAPPING: Dict[str, ToolInfo] = {
         "provider": "agnes",
         "tool_function": generate_image_by_agnes,
     },
-    # 视频工具保持不变
+    # 视频：仅 Seedance 2.0（账号未开通 v1 pro/lite，避免 Agent 误调）
     "generate_video_by_agnes": {
         "display_name": "Seedance 2.0",
         "type": "video",
         "provider": "volces",
         "tool_function": generate_video_by_agnes,
-    },
-    "generate_video_by_seedance_v1_pro_volces": {
-        "display_name": "Doubao Seedance v1 by volces",
-        "type": "video",
-        "provider": "volces",
-        "tool_function": generate_video_by_seedance_v1_pro_volces,
-    },
-    "generate_video_by_seedance_v1_lite_volces_t2v": {
-        "display_name": "Doubao Seedance v1 lite(text-to-video)",
-        "type": "video",
-        "provider": "volces",
-        "tool_function": generate_video_by_seedance_v1_lite_t2v,
-    },
-    "generate_video_by_seedance_v1_lite_i2v_volces": {
-        "display_name": "Doubao Seedance v1 lite(images-to-video)",
-        "type": "video",
-        "provider": "volces",
-        "tool_function": generate_video_by_seedance_v1_lite_i2v,
     },
     "search_video_by_platform": {
         "display_name": "Video Search",

@@ -12,7 +12,7 @@ from tools.agnes_model_config import VOLCES_VIDEO_MODEL_DEFAULT
 from tools.video_generation.constants import VIDEO_CREATE_RATE_LIMIT_SECONDS
 from .utils.image_utils import process_input_image
 
-VALID_ASPECT_RATIOS = {"1:1", "16:9", "9:16", "4:3", "21:9", "3:4"}
+VALID_ASPECT_RATIOS = {"1:1", "16:9", "9:16", "4:3", "21:9", "3:4", "3:2"}
 DEFAULT_ASPECT_RATIO = "9:16"
 LEGACY_DEFAULT_ASPECT_RATIO = "16:9"
 

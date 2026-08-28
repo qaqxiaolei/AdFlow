@@ -11,9 +11,10 @@ from langchain_openai import ChatOpenAI
 from langchain_ollama import ChatOllama
 from services.websocket_service import send_to_websocket  # type: ignore
 from services.config_service import config_service
-from typing import Optional, List, Dict, Any, cast, Set
+from typing import Optional, List, Dict, Any, cast
 from typing_extensions import TypedDict
 from models.config_model import ModelInfo
+from .chat_history_fix import fix_openai_chat_history
 
 
 class ContextInfo(TypedDict):
@@ -46,61 +47,6 @@ def _extract_last_user_prompt(messages: List[Dict[str, Any]]) -> str:
     return ''
 
 
-def _fix_chat_history(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """修复聊天历史中不完整的工具调用
-
-    根据LangGraph文档建议，移除没有对应ToolMessage的tool_calls
-    参考: https://langchain-ai.github.io/langgraph/troubleshooting/errors/INVALID_CHAT_HISTORY/
-    """
-    if not messages:
-        return messages
-
-    fixed_messages: List[Dict[str, Any]] = []
-    tool_call_ids: Set[str] = set()
-
-    # 第一遍：收集所有ToolMessage的tool_call_id
-    for msg in messages:
-        if msg.get('role') == 'tool' and msg.get('tool_call_id'):
-            tool_call_id = msg.get('tool_call_id')
-            if tool_call_id:
-                tool_call_ids.add(tool_call_id)
-
-    # 第二遍：修复AIMessage中的tool_calls
-    for msg in messages:
-        if msg.get('role') == 'assistant' and msg.get('tool_calls'):
-            # 过滤掉没有对应ToolMessage的tool_calls
-            valid_tool_calls: List[Dict[str, Any]] = []
-            removed_calls: List[str] = []
-
-            for tool_call in msg.get('tool_calls', []):
-                tool_call_id = tool_call.get('id')
-                if tool_call_id in tool_call_ids:
-                    valid_tool_calls.append(tool_call)
-                elif tool_call_id:
-                    removed_calls.append(tool_call_id)
-
-            # 记录修复信息
-            if removed_calls:
-                print(
-                    f"🔧 修复消息历史：移除了 {len(removed_calls)} 个不完整的工具调用: {removed_calls}")
-
-            # 更新消息
-            if valid_tool_calls:
-                msg_copy = msg.copy()
-                msg_copy['tool_calls'] = valid_tool_calls
-                fixed_messages.append(msg_copy)
-            elif msg.get('content'):  # 如果没有有效的tool_calls但有content，保留消息
-                msg_copy = msg.copy()
-                msg_copy.pop('tool_calls', None)  # 移除空的tool_calls
-                fixed_messages.append(msg_copy)
-            # 如果既没有有效tool_calls也没有content，跳过这条消息
-        else:
-            # 非assistant消息或没有tool_calls的消息直接保留
-            fixed_messages.append(msg)
-
-    return fixed_messages
-
-
 async def langgraph_multi_agent(
     messages: List[Dict[str, Any]],
     canvas_id: str,
@@ -124,7 +70,7 @@ async def langgraph_multi_agent(
     try:
         # 0. 修复消息历史
         monitor.start('fix_history')
-        fixed_messages = _fix_chat_history(messages)
+        fixed_messages = fix_openai_chat_history(messages)
         monitor.end('fix_history')
 
         # 1. 尝试从缓存获取模型实例

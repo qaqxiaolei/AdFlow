@@ -1,9 +1,10 @@
-from typing import Annotated
-from pydantic import BaseModel, Field
+from typing import Annotated, Any
+from pydantic import BaseModel, Field, field_validator
 from langchain_core.tools import tool, InjectedToolCallId  # type: ignore
 from langchain_core.runnables import RunnableConfig
 from tools.video_generation.video_generation_core import generate_video_with_provider
 from .utils.image_utils import process_input_image
+from .video_generation.input_images_compat import coerce_input_images
 
 
 class GenerateVideoBySeedanceV1InputSchema(BaseModel):
@@ -20,17 +21,22 @@ class GenerateVideoBySeedanceV1InputSchema(BaseModel):
     )
     aspect_ratio: str = Field(
         default="16:9",
-        description="Optional. The aspect ratio of the video. Allowed values: 1:1, 16:9, 4:3, 21:9"
+        description="Optional. The aspect ratio of the video. Allowed values: 1:1, 16:9, 9:16, 4:3, 3:2, 21:9"
     )
     input_images: list[str] | None = Field(
         default=None,
-        description="Optional. Images to use as reference or first frame. Pass a list of image_id here, e.g. ['im_jurheut7.png']."
+        description="Optional. Images to use as reference or first frame. Pass a JSON list of image_id, e.g. ['im_jurheut7.png']."
     )
     camera_fixed: bool = Field(
         default=True,
         description="Optional. Whether to keep the camera fixed (no camera movement)."
     )
     tool_call_id: Annotated[str, InjectedToolCallId]
+
+    @field_validator("input_images", mode="before")
+    @classmethod
+    def _coerce_images(cls, value: Any) -> list[str] | None:
+        return coerce_input_images(value)
 
 
 @tool("generate_video_by_seedance_v1_pro_volces",

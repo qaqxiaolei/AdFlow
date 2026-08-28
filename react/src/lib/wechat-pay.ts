@@ -114,6 +114,8 @@ export function loadWechatOpenid(): string | null {
   }
 }
 
+const RECHARGE_RETURN_CONSUMED_KEY = 'adflow_recharge_return_consumed'
+
 export function hasWechatRechargeReturn(): boolean {
   if (typeof window === 'undefined') return false
   const params = new URLSearchParams(window.location.search)
@@ -124,6 +126,32 @@ export function hasWechatRechargeReturn(): boolean {
     params.has('open_recharge') ||
     Boolean(loadPendingRechargeOrder())
   )
+}
+
+/** 标记本次回跳已自动打开过弹窗，避免多处挂载/路由切换重复弹窗 */
+export function consumeWechatRechargeReturn(): boolean {
+  if (!hasWechatRechargeReturn()) return false
+  try {
+    if (sessionStorage.getItem(RECHARGE_RETURN_CONSUMED_KEY) === '1') {
+      return false
+    }
+    sessionStorage.setItem(RECHARGE_RETURN_CONSUMED_KEY, '1')
+  } catch {
+    // ignore
+  }
+  return true
+}
+
+/** 用户关闭充值弹窗：清掉待支付标记，避免之后点别处又弹出来 */
+export function dismissWechatRechargeReturn() {
+  clearPendingRechargeOrder()
+  clearPendingRechargePackage()
+  clearRechargeQueryParams()
+  try {
+    sessionStorage.removeItem(RECHARGE_RETURN_CONSUMED_KEY)
+  } catch {
+    // ignore
+  }
 }
 
 export function clearRechargeQueryParams() {

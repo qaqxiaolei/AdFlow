@@ -10,6 +10,7 @@ from .configs import (
     BaseAgentConfig,
 )
 from services.tool_service import tool_service
+from .chat_history_fix import pre_model_hook_fix_history
 
 
 class AgentManager:
@@ -88,7 +89,9 @@ class AgentManager:
             name=config.name,
             model=model,
             tools=[*business_tools, *handoff_tools],
-            prompt=config.system_prompt
+            prompt=config.system_prompt,
+            # write_plan 与 handoff 同轮调用时会缺 ToolMessage，调用前自动补全
+            pre_model_hook=pre_model_hook_fix_history,
         )
 
     @staticmethod

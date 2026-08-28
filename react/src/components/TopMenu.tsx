@@ -50,7 +50,7 @@ export default function TopMenu({
           )}
           <motion.div className="flex relative overflow-hidden items-start min-h-7 text-base sm:text-xl font-bold min-w-0">
             <motion.span className="truncate" layout>
-              {isHome ? 'AI数字动画场景应用系统2.0' : t('canvas:back')}
+              {isHome ? '蛮闪AI' : t('canvas:back')}
             </motion.span>
           </motion.div>
         </motion.div>
