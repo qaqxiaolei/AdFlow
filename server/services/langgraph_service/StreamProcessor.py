@@ -5,6 +5,13 @@ from langchain_core.messages import AIMessageChunk, ToolCall, convert_to_openai_
 from langgraph.graph import StateGraph
 import json
 
+from .fake_tool_call import (
+    RETRY_CORRECTION_MESSAGE,
+    get_last_assistant_message,
+    is_textual_fake_tool_call,
+    sanitize_assistant_message_content,
+)
+
 
 class StreamProcessor:
     """流式处理器 - 负责处理智能体的流式输出"""
@@ -16,6 +23,7 @@ class StreamProcessor:
         self.tool_calls: List[ToolCall] = []
         self.last_saved_message_index = 0
         self.last_streaming_tool_call_id: Optional[str] = None
+        self.latest_oai_messages: List[Dict[str, Any]] = []
 
     async def process_stream(self, swarm: StateGraph, messages: List[Dict[str, Any]], context: Dict[str, Any]) -> None:
         """处理整个流式响应
@@ -26,9 +34,25 @@ class StreamProcessor:
             context: 上下文信息
         """
         self.last_saved_message_index = len(messages) - 1
+        self.latest_oai_messages = list(messages)
 
         compiled_swarm = swarm.compile()
+        await self._run_astream(compiled_swarm, messages, context)
 
+        # Flash 模型偶发把工具调用写成 XML 文本：自动纠正并重试一次
+        if await self._maybe_retry_fake_tool_call(compiled_swarm, context):
+            print("🔁 fake tool_call retry finished")
+
+        await self.websocket_service(self.session_id, {
+            'type': 'done'
+        })
+
+    async def _run_astream(
+        self,
+        compiled_swarm: Any,
+        messages: List[Dict[str, Any]],
+        context: Dict[str, Any],
+    ) -> None:
         async for chunk in compiled_swarm.astream(
             {"messages": messages},
             config=context,
@@ -36,10 +60,54 @@ class StreamProcessor:
         ):
             await self._handle_chunk(chunk)
 
-        # 发送完成事件
+    async def _maybe_retry_fake_tool_call(
+        self,
+        compiled_swarm: Any,
+        context: Dict[str, Any],
+    ) -> bool:
+        last = get_last_assistant_message(self.latest_oai_messages)
+        if not is_textual_fake_tool_call(last):
+            return False
+
+        print(
+            "⚠️ Detected textual fake tool_call in assistant content; "
+            "sanitizing and retrying once with correction"
+        )
+
+        sanitized: List[Dict[str, Any]] = []
+        for msg in self.latest_oai_messages:
+            if msg is last:
+                cleaned = sanitize_assistant_message_content(msg)
+                # 空内容也保留一条，避免历史断裂；用隐藏说明替代伪调用
+                content = cleaned.get("content")
+                if (isinstance(content, str) and not content.strip()) or content == []:
+                    cleaned = {
+                        **cleaned,
+                        "content": (
+                            "<hide_in_user_ui>Previous textual tool_call "
+                            "was invalid and discarded.</hide_in_user_ui>"
+                        ),
+                    }
+                sanitized.append(cleaned)
+            else:
+                sanitized.append(msg)
+
+        retry_messages = sanitized + [
+            {"role": "user", "content": RETRY_CORRECTION_MESSAGE}
+        ]
+
+        # 同步前端：去掉假 XML，避免用户一直看到伪调用
         await self.websocket_service(self.session_id, {
-            'type': 'done'
+            'type': 'all_messages',
+            'messages': retry_messages[:-1],
         })
+
+        # 从当前最新消息继续保存，避免重复写入旧历史
+        self.last_saved_message_index = len(retry_messages) - 2
+        self.latest_oai_messages = list(retry_messages[:-1])
+
+        await self._run_astream(compiled_swarm, retry_messages, context)
+        return True
 
     async def _handle_chunk(self, chunk: Any) -> None:
         # print('👇chunk', chunk)
@@ -58,6 +126,8 @@ class StreamProcessor:
         # 确保 oai_messages 是列表类型
         if not isinstance(oai_messages, list):
             oai_messages = [oai_messages] if oai_messages else []
+
+        self.latest_oai_messages = oai_messages
 
         # 发送所有消息到前端
         await self.websocket_service(self.session_id, {

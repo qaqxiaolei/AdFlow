@@ -291,6 +291,14 @@ async def get_video_info_and_save(
         await out_file.write(video_content)
     print("🎥 Video saved to", temp_path)
 
+    # 将 moov 挪到文件头，方便手机边下边播（不重编码）
+    try:
+        from tools.video_generation.mp4_faststart import apply_mp4_faststart
+
+        await asyncio.to_thread(apply_mp4_faststart, temp_path)
+    except Exception as faststart_error:
+        print(f"[faststart] ignored error: {faststart_error}")
+
     try:
         media_info = MediaInfo.parse(temp_path)  # type: ignore
         width: int = 0

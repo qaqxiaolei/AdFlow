@@ -17,9 +17,12 @@ const MessageRegular: React.FC<MessageRegularProps> = ({
   const markdownText = isStrContent
     ? content
     : content.type === 'text'
-      ? content.text
-      : ''
+    ? content.text
+    : ''
   if (!isText) return <MessageImage content={content} />
+  if (markdownText.includes('<hide_in_user_ui>')) {
+    return null
+  }
 
   return (
     <>

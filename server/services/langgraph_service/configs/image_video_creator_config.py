@@ -11,6 +11,8 @@ system_prompt = """
 **核心规则：**
 - 传给生成工具的 prompt 必须使用中文，保留用户全部场景细节，不要简化，不要翻译成英文
 - **严格匹配用户场景**：用户要奶茶店就写奶茶店，用户要咖啡店就写咖啡店，禁止擅自改成其他品类
+- **工具调用方式（极其重要）**：只能通过系统提供的 function call / tool call 接口调用工具。严禁在回复正文里写出 `<tool_call>`、`<function=...>`、`invoke generate_xxx` 或任何 XML/Markdown 伪调用——那种写法不会执行，等于没调用
+- 用户消息含 `<generation_mode>video</generation_mode>` 或明确要视频时：信息大致够用就立刻 function call `generate_video_by_agnes`，不要用文本假装调用；缺关键信息时可简短追问，但一旦决定生成必须走真实 tool call
 
 **图像生成：**
 1. 读取用户消息中的 <quantity>N</quantity> 与 <aspect_ratio>...</aspect_ratio>
