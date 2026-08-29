@@ -8,7 +8,7 @@ import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { nanoid } from 'nanoid'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import TopMenu from '@/components/TopMenu'
@@ -30,7 +30,7 @@ function Home() {
   const [activeVideo, setActiveVideo] = useState(0)
   /** 仅当视频真正开始播放时才显示，避免微信露出大播放按钮 */
   const [playingVisible, setPlayingVisible] = useState(false)
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([])
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   const { mutate: createCanvasMutation, isPending } = useMutation({
     mutationFn: createCanvas,
     onSuccess: (data, variables) => {
@@ -62,7 +62,7 @@ function Home() {
     video.setAttribute('x5-video-player-fullscreen', 'false')
   }
 
-  const tryPlay = (video: HTMLVideoElement) => {
+  const tryPlay = useCallback((video: HTMLVideoElement) => {
     prepareVideo(video)
     const playPromise = video.play()
     if (playPromise && typeof playPromise.then === 'function') {
@@ -70,28 +70,21 @@ function Home() {
         .then(() => setPlayingVisible(true))
         .catch(() => setPlayingVisible(false))
     }
-  }
+  }, [])
 
+  // 只挂载当前这一条视频，避免三条 MP4 同时下载（云端首屏约省 4MB+）
   useEffect(() => {
-    videoRefs.current.forEach((video, index) => {
-      if (!video) return
-      prepareVideo(video)
-      if (index === activeVideo) {
-        tryPlay(video)
-      } else {
-        video.pause()
-        try {
-          video.currentTime = 0
-        } catch {
-          // ignore
-        }
-      }
-    })
-  }, [activeVideo])
+    const video = videoRef.current
+    if (!video) return
+    setPlayingVisible(false)
+    prepareVideo(video)
+    video.load()
+    tryPlay(video)
+  }, [activeVideo, tryPlay])
 
   useEffect(() => {
     const resume = () => {
-      const video = videoRefs.current[activeVideo]
+      const video = videoRef.current
       if (video && video.paused) tryPlay(video)
     }
     document.addEventListener('touchstart', resume, { once: true, passive: true })
@@ -100,7 +93,12 @@ function Home() {
       document.removeEventListener('touchstart', resume)
       document.removeEventListener('click', resume)
     }
-  }, [activeVideo])
+  }, [activeVideo, tryPlay])
+
+  const advanceVideo = () => {
+    setPlayingVisible(false)
+    setActiveVideo((current) => (current + 1) % BACKGROUND_VIDEOS.length)
+  }
 
   return (
     <div className="relative flex flex-col h-dvh min-h-0 overflow-hidden bg-background">
@@ -111,38 +109,24 @@ function Home() {
             className="absolute inset-0 overflow-hidden pointer-events-none home-hero-video-mask"
             aria-hidden
           >
-            {BACKGROUND_VIDEOS.map((src, index) => (
-              <video
-                key={src}
-                ref={(el) => {
-                  videoRefs.current[index] = el
-                }}
-                className={`home-bg-video absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${index === activeVideo && playingVisible
-                  ? 'opacity-75'
-                  : 'opacity-0'
-                  }`}
-                src={src}
-                muted
-                autoPlay
-                playsInline
-                preload="metadata"
-                controls={false}
-                disablePictureInPicture
-                disableRemotePlayback
-                onPlaying={() => {
-                  if (index === activeVideo) setPlayingVisible(true)
-                }}
-                onError={() => {
-                  if (index === activeVideo) setPlayingVisible(false)
-                }}
-                onEnded={() => {
-                  setPlayingVisible(false)
-                  setActiveVideo(
-                    (current) => (current + 1) % BACKGROUND_VIDEOS.length
-                  )
-                }}
-              />
-            ))}
+            <video
+              key={BACKGROUND_VIDEOS[activeVideo]}
+              ref={videoRef}
+              className={`home-bg-video absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
+                playingVisible ? 'opacity-75' : 'opacity-0'
+              }`}
+              src={BACKGROUND_VIDEOS[activeVideo]}
+              muted
+              autoPlay
+              playsInline
+              preload="auto"
+              controls={false}
+              disablePictureInPicture
+              disableRemotePlayback
+              onPlaying={() => setPlayingVisible(true)}
+              onError={advanceVideo}
+              onEnded={advanceVideo}
+            />
           </div>
 
           <TopMenu />
@@ -198,10 +182,19 @@ function Home() {
             aria-hidden
           >
             <img
-              src="/background.png"
+              src="/background.webp"
               alt=""
               className="h-[min(100%,480px)] w-auto max-w-[92%] object-contain select-none"
               draggable={false}
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                // 旧部署若尚未带上 webp，回退 png
+                const img = e.currentTarget
+                if (!img.src.endsWith('/background.png')) {
+                  img.src = '/background.png'
+                }
+              }}
             />
           </div>
           <div className="relative z-10">

@@ -142,21 +142,46 @@ app.include_router(billing_router.router)
 react_build_dir = os.environ.get('UI_DIST_DIR', os.path.join(
     os.path.dirname(root_dir), "react", "dist"))
 
+# Vite 产物带 hash，可长期缓存；首页视频/图片也允许缓存，避免域名重复慢加载
+_CACHEABLE_SUFFIXES = (
+    ".js", ".css", ".woff", ".woff2", ".ttf", ".eot",
+    ".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico",
+    ".mp4", ".webm", ".mov",
+)
 
-# 无缓存静态文件类
-class NoCacheStaticFiles(StaticFiles):
+
+class CachedStaticFiles(StaticFiles):
+    """带长期缓存的静态资源（适用于带 hash 的 /assets 与首页媒体）"""
+
     async def get_response(self, path: str, scope: Scope) -> Response:
         response = await super().get_response(path, scope)
         if response.status_code == 200:
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return response
+
+
+def _dist_file_response(rel_path: str) -> FileResponse | None:
+    """安全读取 react/dist 下的文件，禁止路径穿越。"""
+    if not rel_path or ".." in rel_path.replace("\\", "/").split("/"):
+        return None
+    full = os.path.normpath(os.path.join(react_build_dir, rel_path))
+    if not full.startswith(os.path.normpath(react_build_dir)):
+        return None
+    if not os.path.isfile(full):
+        return None
+    response = FileResponse(full)
+    lower = rel_path.lower()
+    if any(lower.endswith(suf) for suf in _CACHEABLE_SUFFIXES):
+        response.headers["Cache-Control"] = "public, max-age=604800"
+    else:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
 
 
 static_site = os.path.join(react_build_dir, "assets")
 if os.path.exists(static_site):
-    app.mount("/assets", NoCacheStaticFiles(directory=static_site), name="assets")
+    # 带 content hash 的打包资源：长期缓存
+    app.mount("/assets", CachedStaticFiles(directory=static_site), name="assets")
 
 
 @app.get("/")
@@ -166,6 +191,21 @@ async def serve_react_app():
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+@app.get("/{full_path:path}")
+async def serve_spa_or_static(full_path: str):
+    """提供 dist 根目录媒体（如 /backgroudVideo1.mp4），其余回退到 SPA。"""
+    # API / 已注册路由优先；此处仅兜底静态与前端路由
+    static_resp = _dist_file_response(full_path)
+    if static_resp is not None:
+        return static_resp
+    index_path = os.path.join(react_build_dir, "index.html")
+    if os.path.isfile(index_path):
+        response = FileResponse(index_path)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return response
+    return Response(status_code=404)
 
 
 print('Creating socketio app')
