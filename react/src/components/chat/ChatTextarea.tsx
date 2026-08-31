@@ -261,9 +261,8 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     if (selectedAspectRatio !== 'auto') {
       additionalInfo += `<aspect_ratio>${selectedAspectRatio}</aspect_ratio>\n`
     }
-    if (quantity !== 1) {
-      additionalInfo += `<quantity>${quantity}</quantity>\n`
-    }
+    // 始终带上数量，避免 Agent 在无标签时擅自 quantity=2
+    additionalInfo += `<quantity>${quantity}</quantity>\n`
     additionalInfo += `<generation_mode>${generationMode}</generation_mode>\n`
     if (additionalInfo) {
       text_content = text_content + '\n\n' + additionalInfo
@@ -538,7 +537,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
 
       <Textarea
         ref={textareaRef}
-        className="w-full h-full border-none outline-none resize-none"
+        className="w-full h-full border-none outline-none resize-none text-base"
         placeholder={
           generationMode === 'image'
             ? t('chat:textarea.placeholderImage')

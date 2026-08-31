@@ -143,7 +143,8 @@ def _resolve_quantity(
                 return max(1, min(2, int(prompt_quantity)))
             except ValueError:
                 pass
-    return max(1, min(2, quantity))
+    # 用户未带 <quantity> 时默认 1，勿采用 Agent 擅自传入的 quantity=2
+    return 1
 
 
 def _parse_input_images(input_images: Any) -> list[str] | None:

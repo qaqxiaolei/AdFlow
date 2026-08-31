@@ -84,6 +84,8 @@ const CanvasCard: React.FC<CanvasCardProps> = ({
                         src={canvas.thumbnail}
                         alt={canvas.name}
                         className="w-full h-40 object-cover rounded-lg bg-muted"
+                        loading="lazy"
+                        decoding="async"
                         onError={() => setThumbnailError(true)}
                     />
                 )}

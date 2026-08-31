@@ -8,18 +8,36 @@ from tools.agnes_model_config import AGNES_IMAGE_MODEL_DEFAULT
 
 _generating_covers: set[str] = set()
 DEFAULT_CANVAS_NAMES = frozenset({"", "未命名", "Untitled"})
-MAX_CANVAS_NAME_LENGTH = 32
+MAX_CANVAS_NAME_LENGTH = 18
 
 
 def _strip_generation_tags(text: str) -> str:
     cleaned = re.sub(
-        r"<aspect_ratio>.*?</aspect_ratio>\s*",
+        r"<(aspect_ratio|quantity|generation_mode|input_images)\b[^>]*>.*?</\1>\s*",
         "",
         text,
         flags=re.IGNORECASE | re.DOTALL,
     )
     cleaned = re.sub(
+        r"<(aspect_ratio|quantity|generation_mode)\b[^>]*/>\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(
+        r"<aspect_ratio>.*?</aspect_ratio>\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    cleaned = re.sub(
         r"<quantity>.*?</quantity>\s*",
+        "",
+        cleaned,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    cleaned = re.sub(
+        r"<generation_mode>.*?</generation_mode>\s*",
         "",
         cleaned,
         flags=re.IGNORECASE | re.DOTALL,
@@ -59,9 +77,15 @@ def build_canvas_name_from_prompt(
         return "未命名"
 
     cleaned = re.sub(r"\s+", " ", cleaned)
+    # 去掉常见请求前缀，只保留主题
+    cleaned = re.sub(
+        r"^(请|帮我|帮忙)?[给]?(我)?(来)?(生成|做|制作|创作)(一下|下|个|一条|一款|一支|一份)?",
+        "",
+        cleaned,
+    ).strip()
 
     topic_match = re.search(
-        r"生成(?:一个|一款|一条|一支|一份)?(.{2,24}?)(?:的)?(?:爆款)?(?:宣传)?(?:视频|短片|广告|海报|封面|图片)",
+        r"(?:^|[，, ])(.{1,20}?)(?:的)?(?:爆款)?(?:宣传)?(?:视频|短片|广告|海报|封面|图片|宣传片)",
         cleaned,
     )
     if topic_match:
@@ -74,6 +98,7 @@ def build_canvas_name_from_prompt(
                     cleaned = first_part
                     break
 
+    cleaned = cleaned.strip("的、，, ")
     if len(cleaned) > max_length:
         cleaned = cleaned[:max_length].rstrip() + "…"
 

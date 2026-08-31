@@ -19,6 +19,9 @@ const BACKGROUND_VIDEOS = [
   '/backgroudVideo3.mp4',
 ] as const
 
+/** 首屏静帧，视频未就绪前先显示，避免黑屏/白屏等待 */
+const HERO_POSTER = '/hero-poster.webp'
+
 export const Route = createFileRoute('/')({
   component: Home,
 })
@@ -72,7 +75,7 @@ function Home() {
     }
   }, [])
 
-  // 只挂载当前这一条视频，避免三条 MP4 同时下载（云端首屏约省 4MB+）
+  // 同一时刻只挂载一条视频，避免三条 MP4 同时下载
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -95,10 +98,10 @@ function Home() {
     }
   }, [activeVideo, tryPlay])
 
-  const advanceVideo = () => {
+  const advanceVideo = useCallback(() => {
     setPlayingVisible(false)
     setActiveVideo((current) => (current + 1) % BACKGROUND_VIDEOS.length)
-  }
+  }, [])
 
   return (
     <div className="relative flex flex-col h-dvh min-h-0 overflow-hidden bg-background">
@@ -109,6 +112,17 @@ function Home() {
             className="absolute inset-0 overflow-hidden pointer-events-none home-hero-video-mask"
             aria-hidden
           >
+            {/* 静帧先出：视频缓冲期间不黑屏 */}
+            <img
+              src={HERO_POSTER}
+              alt=""
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
+                playingVisible ? 'opacity-0' : 'opacity-75'
+              }`}
+              draggable={false}
+              decoding="async"
+              fetchPriority="high"
+            />
             <video
               key={BACKGROUND_VIDEOS[activeVideo]}
               ref={videoRef}
@@ -116,10 +130,11 @@ function Home() {
                 playingVisible ? 'opacity-75' : 'opacity-0'
               }`}
               src={BACKGROUND_VIDEOS[activeVideo]}
+              poster={HERO_POSTER}
               muted
               autoPlay
               playsInline
-              preload="auto"
+              preload="metadata"
               controls={false}
               disablePictureInPicture
               disableRemotePlayback
@@ -175,28 +190,12 @@ function Home() {
           </div>
         </div>
 
-        {/* 下方：最近项目 + 吉祥物水印背景（黑底图用 blend/mask 弱化，不抢卡片） */}
+        {/* 下方：最近项目 + 吉祥物水印（CSS 背景，失败不出现蓝问号；~22KB webp） */}
         <div className="relative z-0 sm:z-10 min-h-[50vh] sm:min-h-[55vh] overflow-hidden bg-background pt-6 sm:pt-10">
           <div
-            className="pointer-events-none absolute inset-0 flex items-center justify-center home-projects-mascot"
+            className="pointer-events-none absolute inset-0 home-projects-mascot home-projects-mascot-bg"
             aria-hidden
-          >
-            <img
-              src="/background.webp"
-              alt=""
-              className="h-[min(100%,480px)] w-auto max-w-[92%] object-contain select-none"
-              draggable={false}
-              loading="lazy"
-              decoding="async"
-              onError={(e) => {
-                // 旧部署若尚未带上 webp，回退 png
-                const img = e.currentTarget
-                if (!img.src.endsWith('/background.png')) {
-                  img.src = '/background.png'
-                }
-              }}
-            />
-          </div>
+          />
           <div className="relative z-10">
             <CanvasList />
           </div>

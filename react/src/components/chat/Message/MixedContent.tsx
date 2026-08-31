@@ -1,4 +1,5 @@
 import { Message, MessageContent } from '@/types/types'
+import { stripInternalMessageTags } from '@/utils/displayMessageText'
 import { Markdown } from '../Markdown'
 import MessageImage from './Image'
 
@@ -48,21 +49,24 @@ export const MixedContentText: React.FC<MixedContentTextProps> = ({ message, con
   const textContents = contents.filter((content) => content.type === 'text')
 
   // 过滤掉文本中的图片引用，只保留纯文本
-  const combinedText = textContents
+  let combinedText = textContents
     .map((content) => content.text)
     .join('\n')
     .replace(/!\[.*?\]\(.*?\)/g, '') // 移除markdown图片语法
     .replace(/!\[.*?\]\[.*?\]/g, '') // 移除引用式图片语法
     .replace(/^\s*$/gm, '') // 移除空行
     .trim()
+  if (message.role === 'user') {
+    combinedText = stripInternalMessageTags(combinedText)
+  }
 
   if (!combinedText) return null
 
   return (
     <>
       {message.role === 'user' ? (
-        <div className="flex justify-end mb-4">
-          <div className="bg-primary text-primary-foreground rounded-xl rounded-br-md px-4 py-3 text-left max-w-[300px] w-fit">
+        <div className="flex justify-end mb-4 min-w-0 w-full">
+          <div className="bg-primary text-primary-foreground rounded-xl rounded-br-md px-4 py-3 text-left max-w-[min(100%,20rem)] min-w-0 w-fit overflow-hidden break-words [overflow-wrap:anywhere]">
             <div className="w-full">
               <Markdown>{combinedText}</Markdown>
             </div>

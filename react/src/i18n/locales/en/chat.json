@@ -23,7 +23,12 @@
     "showMore": "Show More",
     "showLess": "Show Less",
     "videoDownload": "Save video",
-    "videoDownloadFailed": "Save failed. Long-press the video to save it."
+    "videoDownloadFailed": "Save failed. Long-press the video to save it.",
+    "tapToPlay": "Tap to play",
+    "wechatTapToPlay": "Open in system player",
+    "wechatOpenHint": "Video opened in WeChat — long-press to save",
+    "openVideo": "Open in browser",
+    "videoLoadFailed": "Video failed to load. Try saving and playing locally."
   },
   "thinking": {
     "title": "Thinking"

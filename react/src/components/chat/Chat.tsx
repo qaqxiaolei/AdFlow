@@ -19,6 +19,7 @@ import {
     SetStateAction,
     useCallback,
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from 'react'
@@ -42,6 +43,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useQueryClient } from '@tanstack/react-query'
 import MixedContent, { MixedContentImages, MixedContentText } from './Message/MixedContent'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { stripDuplicateVideoMarkdown } from '@/lib/resolveMediaUrl'
 
 
 type ChatInterfaceProps = {
@@ -761,6 +763,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         setPending(false)
     }, [])
 
+    const messagesForDisplay = useMemo(() => {
+        const seen = new Set<string>()
+        return messages.map((message) => {
+            if (typeof message.content !== 'string' || message.role === 'tool') {
+                return message
+            }
+            const content = stripDuplicateVideoMarkdown(message.content, seen)
+            if (content === message.content) return message
+            return { ...message, content }
+        })
+    }, [messages])
+
     return (
         <PhotoProvider>
             <div className='flex flex-col flex-1 relative w-full min-h-0'>
@@ -782,8 +796,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
                     <ScrollArea className='flex-1 min-h-0' viewportRef={scrollRef}>
                         {messages.length > 0 ? (
-                            <div className='flex flex-col flex-1 px-3 py-3 sm:px-4 sm:py-4'>
-                                {messages.map((message, idx) => (
+                            <div className='flex flex-col flex-1 px-3 py-3 sm:px-4 sm:py-4 min-w-0 overflow-x-hidden'>
+                                {messagesForDisplay.map((message, idx) => (
                                     <div key={`${idx}`} className='flex flex-col gap-3 sm:gap-4 mb-2'>
                                         {typeof message.content == 'string' &&
                                             (message.role !== 'tool' ? (

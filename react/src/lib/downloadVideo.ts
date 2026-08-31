@@ -1,10 +1,4 @@
-function resolveVideoUrl(src: string): string {
-  if (src.startsWith('http://') || src.startsWith('https://')) {
-    return src
-  }
-  const path = src.startsWith('/') ? src : `/${src}`
-  return `${window.location.origin}${path}`
-}
+import { isWeChatBrowser, resolveMediaUrl } from '@/lib/resolveMediaUrl'
 
 function extractFilename(src: string, title?: string): string {
   if (title?.trim()) {
@@ -23,7 +17,9 @@ function withDownloadParam(url: string): string {
 }
 
 async function fetchVideoBlob(url: string): Promise<Blob> {
-  const response = await fetch(withDownloadParam(url), { credentials: 'same-origin' })
+  const response = await fetch(withDownloadParam(url), {
+    credentials: 'same-origin',
+  })
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`)
   }
@@ -60,13 +56,26 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(objectUrl)
 }
 
-/** 下载或保存聊天中的生成视频，兼容 iOS / Android 移动端。 */
+/** 微信内直接打开 mp4，系统播放器里可长按保存 */
+export function openVideoDirectly(src: string): void {
+  const url = withDownloadParam(resolveMediaUrl(src))
+  window.location.href = url
+}
+
+/** 下载或保存聊天中的生成视频，兼容 iOS / Android / 微信 */
 export async function downloadVideoFile(
   src: string,
   title?: string
 ): Promise<void> {
-  const url = resolveVideoUrl(src)
+  const url = resolveMediaUrl(src)
   const filename = extractFilename(src, title)
+
+  // 微信里 blob 下载常失效，优先走系统播放器
+  if (isWeChatBrowser()) {
+    openVideoDirectly(src)
+    return
+  }
+
   const blob = await fetchVideoBlob(url)
 
   try {

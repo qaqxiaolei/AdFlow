@@ -1,4 +1,4 @@
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.concurrency import run_in_threadpool
 from tools.utils.image_canvas_utils import generate_file_id
 from services.config_service import FILES_DIR
@@ -14,6 +14,25 @@ from utils.http_client import HttpClient
 
 router = APIRouter(prefix="/api")
 os.makedirs(FILES_DIR, exist_ok=True)
+
+
+async def ensure_video_poster(file_id: str) -> str | None:
+    """vi_xxx.jpg 不存在时，从同名 mp4 抽一帧封面。"""
+    lower = file_id.lower()
+    if not lower.startswith('vi_') or not lower.endswith(('.jpg', '.jpeg')):
+        return None
+    poster_path = os.path.join(FILES_DIR, file_id)
+    if os.path.exists(poster_path):
+        return poster_path
+    stem = file_id.rsplit('.', 1)[0]
+    mp4_path = os.path.join(FILES_DIR, f'{stem}.mp4')
+    if not os.path.exists(mp4_path):
+        return None
+    from tools.video_generation.mp4_faststart import extract_video_poster
+    ok = await run_in_threadpool(extract_video_poster, mp4_path, poster_path)
+    if ok and os.path.exists(poster_path):
+        return poster_path
+    return None
 
 # 上传图片接口，支持表单提交
 @router.post("/upload_image")
@@ -143,23 +162,57 @@ def compress_image(img: Image.Image, max_size_mb: float) -> bytes:
     return buffer.getvalue()
 
 
-# 文件下载接口
+# 文件下载接口（显式支持 HEAD，供 CDN/播放器探测）
+@router.head("/file/{file_id}")
+async def head_file(file_id: str):
+    file_path = os.path.join(FILES_DIR, f'{file_id}')
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    media_type, _ = guess_type(file_path)
+    lower_name = file_id.lower()
+    if lower_name.endswith('.mp4'):
+        media_type = 'video/mp4'
+    headers: dict[str, str] = {
+        "Content-Length": str(os.path.getsize(file_path)),
+    }
+    if media_type and media_type.startswith('video/'):
+        headers['Accept-Ranges'] = 'bytes'
+    return Response(status_code=200, media_type=media_type, headers=headers)
+
+
 @router.get("/file/{file_id}")
 async def get_file(file_id: str, download: bool = Query(False)):
     file_path = os.path.join(FILES_DIR, f'{file_id}')
     print('🦄get_file file_path', file_path)
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
+        poster_path = await ensure_video_poster(file_id)
+        if poster_path:
+            file_path = poster_path
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
 
     media_type, _ = guess_type(file_path)
+    lower_name = file_id.lower()
+    if lower_name.endswith('.mp4'):
+        media_type = 'video/mp4'
+    elif lower_name.endswith('.webm'):
+        media_type = 'video/webm'
+    elif lower_name.endswith(('.jpg', '.jpeg')):
+        media_type = 'image/jpeg'
+
+    headers: dict[str, str] = {}
+    if not download and media_type and media_type.startswith('video/'):
+        headers['Accept-Ranges'] = 'bytes'
+
     if download:
         return FileResponse(
             file_path,
             media_type=media_type or 'application/octet-stream',
             filename=file_id,
+            headers=headers,
         )
 
-    return FileResponse(file_path, media_type=media_type)
+    return FileResponse(file_path, media_type=media_type, headers=headers)
 
 
 @router.post("/comfyui/object_info")

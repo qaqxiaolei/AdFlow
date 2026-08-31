@@ -4,13 +4,22 @@ import { PhotoView } from 'react-photo-view'
 import remarkGfm from 'remark-gfm'
 import TextFoldTag from './Message/TextFoldTag'
 import ChatVideo from './Message/ChatVideo'
+import { isProbablyVideoUrl } from '@/lib/resolveMediaUrl'
 
 type MarkdownProps = {
     children: string
 }
 
+function rewriteEmbeddedVideoTags(markdown: string): string {
+    return markdown.replace(/<video\b[\s\S]*?<\/video>/gi, (block) => {
+        const src = block.match(/\bsrc=["']([^"']+)["']/i)?.[1]
+        return src ? `\n\n![video](${src})\n\n` : ''
+    })
+}
+
 const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
     const [isThinkExpanded, setIsThinkExpanded] = useState(false)
+    const content = rewriteEmbeddedVideoTags(children)
 
     const processThinkTags = (content: string) => {
         const cleanedContent = content.replace(/<think>\s*<\/think>/g, '')
@@ -55,8 +64,8 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
         return { parts, hasUnclosed: openTags > closeTags }
     }
 
-    const { parts, hasUnclosed } = children.includes('<think>')
-        ? processThinkTags(children)
+    const { parts, hasUnclosed } = content.includes('<think>')
+        ? processThinkTags(content)
         : { parts: [], hasUnclosed: false }
 
     useEffect(() => {
@@ -187,17 +196,14 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
         },
         img: ({ node, children, ...props }) => {
             const src = typeof props.src === 'string' ? props.src : ''
+            const alt = typeof props.alt === 'string' ? props.alt : ''
             const normalizedSrc = src.match(/\/api\/file\/[^\s?)]+/)?.[0] ?? src
-            const isVideo =
-                (props.alt && props.alt.includes('video_id:')) ||
-                /\.mp4(\?|$)/i.test(src) ||
-                /\/api\/file\/vi_/i.test(src)
 
-            if (isVideo) {
+            if (isProbablyVideoUrl(src, alt) || isProbablyVideoUrl(normalizedSrc, alt)) {
                 return (
                     <ChatVideo
                         src={normalizedSrc}
-                        title={typeof props.alt === 'string' ? props.alt : undefined}
+                        title={alt || undefined}
                     />
                 )
             }
@@ -220,7 +226,7 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
         },
     }
     // Special handling if content contains think tags
-    if (children.includes('<think>')) {
+    if (content.includes('<think>')) {
         return (
             <div className="space-y-3 flex flex-col w-full max-w-full">
                 {parts.map((part, index) =>
@@ -256,7 +262,7 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
 
     return (
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-            {children}
+            {content}
         </ReactMarkdown>
     )
 }

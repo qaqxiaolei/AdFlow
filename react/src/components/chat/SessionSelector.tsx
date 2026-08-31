@@ -13,6 +13,7 @@ import { Input } from '../ui/input'
 import { useState } from 'react'
 import { renameChatSession } from '@/api/chat'
 import { getCanvas } from '@/api/canvas'
+import { stripInternalMessageTags, truncateDisplayTitle } from '@/utils/displayMessageText'
 
 type SessionSelectorProps = {
   session: Session | null
@@ -48,8 +49,12 @@ const SessionSelector: React.FC<SessionSelectorProps> = ({
   }
 
   const getSessionTitle = (s: Session) => {
-    return s.title || '未命名'
+    const raw = s.title || '未命名'
+    return stripInternalMessageTags(raw) || '未命名'
   }
+
+  const getSessionDisplayTitle = (s: Session) =>
+    truncateDisplayTitle(s.title || '未命名', 16)
 
   const handleStartEdit = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -89,9 +94,9 @@ const SessionSelector: React.FC<SessionSelectorProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-2 w-full">
+    <div className="flex items-center gap-2 w-full min-w-0">
       {sessionList && sessionList.length > 0 ? (
-        <div className="flex-1 flex items-center">
+        <div className="flex-1 min-w-0 flex items-center">
           {isEditing && session ? (
             <div className="flex items-center gap-2 w-full">
               <Input
@@ -129,7 +134,7 @@ const SessionSelector: React.FC<SessionSelectorProps> = ({
               </Button>
             </div>
           ) : (
-            <div className="flex-1 relative">
+            <div className="flex-1 min-w-0 relative">
               <Select
                 value={session?.id}
                 onValueChange={(value) => {
@@ -137,15 +142,22 @@ const SessionSelector: React.FC<SessionSelectorProps> = ({
                   setIsEditing(false)
                 }}
               >
-                <SelectTrigger className="w-full bg-background">
-                  <SelectValue placeholder="未命名" />
+                <SelectTrigger
+                  className="w-full min-w-0 max-w-full h-9 overflow-hidden pr-9 bg-background [&_[data-slot=select-value]]:truncate [&_[data-slot=select-value]]:block [&_[data-slot=select-value]]:max-w-full"
+                  title={session ? getSessionTitle(session) : undefined}
+                >
+                  <SelectValue placeholder="未命名">
+                    {session ? getSessionDisplayTitle(session) : '未命名'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {sessionList
                     ?.filter((session) => session.id && session.id.trim() !== '')
                     ?.map((session) => (
                       <SelectItem key={session.id} value={session.id}>
-                        {getSessionTitle(session)}
+                        <span className="truncate block max-w-[min(100vw-4rem,20rem)]">
+                          {getSessionDisplayTitle(session)}
+                        </span>
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -170,10 +182,11 @@ const SessionSelector: React.FC<SessionSelectorProps> = ({
       <Button
         variant={'outline'}
         onClick={onClickNewChat}
-        className="shrink-0 gap-1"
+        className="shrink-0 gap-1 px-2 sm:px-3"
+        aria-label={t('chat:newChat')}
       >
         <PlusIcon />
-        <span className="text-sm">{t('chat:newChat')}</span>
+        <span className="hidden sm:inline text-sm">{t('chat:newChat')}</span>
       </Button>
     </div>
   )

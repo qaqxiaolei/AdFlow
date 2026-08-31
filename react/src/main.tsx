@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { PostHogProvider } from 'posthog-js/react'
 import '@/assets/style/index.css'
+import '@/lib/resetViewportScale'
 
 const options = {
   api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,

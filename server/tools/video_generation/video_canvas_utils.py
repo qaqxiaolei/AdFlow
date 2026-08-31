@@ -7,6 +7,7 @@ import json
 import time
 import os
 import asyncio
+import traceback
 from contextlib import asynccontextmanager
 from typing import Dict, List, Any, Tuple, Optional, Union
 from services.config_service import FILES_DIR
@@ -291,13 +292,21 @@ async def get_video_info_and_save(
         await out_file.write(video_content)
     print("🎥 Video saved to", temp_path)
 
-    # 将 moov 挪到文件头，方便手机边下边播（不重编码）
+    # faststart + 必要时转 H.264，并抽取封面
     try:
-        from tools.video_generation.mp4_faststart import apply_mp4_faststart
+        from tools.video_generation.mp4_faststart import (
+            ensure_mobile_playable_mp4,
+            extract_video_poster,
+        )
 
-        await asyncio.to_thread(apply_mp4_faststart, temp_path)
-    except Exception as faststart_error:
-        print(f"[faststart] ignored error: {faststart_error}")
+        await asyncio.to_thread(ensure_mobile_playable_mp4, temp_path)
+        poster_path = f"{file_path_without_extension}.jpg"
+        await asyncio.to_thread(extract_video_poster, temp_path, poster_path)
+    except Exception as postprocess_error:
+        print(f"[video postprocess] error: {postprocess_error}")
+        msg = str(postprocess_error)
+        if "过小" in msg or "无法播放" in msg or "后处理失败" in msg:
+            raise
 
     try:
         media_info = MediaInfo.parse(temp_path)  # type: ignore

@@ -40,14 +40,18 @@ system_prompt = """
 
 **视频参数：**
 - 时长 ≤ 15秒，默认 duration=15（可选 5、10、15）
-- 分辨率默认 resolution="1080p"；仅当 quantity=2 求速度时可用 480p
+- 分辨率默认 resolution="1080p"；仅当 <quantity>2</quantity> 求速度时可用 480p
 - **比例强制**：必须读取用户消息中的 <aspect_ratio>...</aspect_ratio>，原样传入 aspect_ratio 与 ratio（支持 3:2、9:16 等）。禁止擅自改成 16:9
-- 用户消息含 <quantity>2</quantity> 时传 quantity=2；两种风格时只调用 1 次工具并设 quantity=2
+- **数量强制（极其重要）**：
+  - 用户消息含 `<quantity>1</quantity>` 或未写 quantity → **只调用 1 次** `generate_video_by_agnes`，且 **quantity=1**，只生成 1 个视频
+  - **仅当**用户消息含 `<quantity>2</quantity>` 时 → 调用 **1 次**工具并传 **quantity=2**（工具内生成写实+仿真人两条）
+  - **禁止**在 quantity=1 时传 quantity=2；**禁止**连续调用两次 generate_video_by_agnes
 - 未指定比例时短视频默认 9:16（竖屏），不要用 16:9
 - 有 <input_images> 时解析 file_id，以数组形式传入 input_images
 - 奶茶等探店视频：prompt 写清「半身店员、产品居中、手部虚化、特写背景保留人流」
 
 **多视频与展示：**
+- quantity=1 时工具只返回 1 条视频；quantity=2 时返回 2 条（写实+仿真人）
 - 不要分两次调用工具，也不要先 write_plan 再逐个生成
 - 某风格生成失败须如实告知，禁止编造视频链接
 - 展示时原样复制工具返回格式：`![video_id: vi_xxx.mp4](/api/file/vi_xxx.mp4)`
