@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react'
+import { Children, isValidElement, memo, useState, useEffect } from 'react'
 import ReactMarkdown, { Components } from 'react-markdown'
 import { PhotoView } from 'react-photo-view'
 import remarkGfm from 'remark-gfm'
@@ -194,15 +194,30 @@ const NonMemoizedMarkdown: React.FC<MarkdownProps> = ({ children }) => {
                 </blockquote>
             )
         },
+        p: ({ node, children, ...props }) => {
+            const childArray = Children.toArray(children)
+            const hasVideo = childArray.some(
+                (child) => isValidElement(child) && child.type === ChatVideo
+            )
+            if (hasVideo) {
+                return <div className="my-2">{children}</div>
+            }
+            return <p {...props}>{children}</p>
+        },
         img: ({ node, children, ...props }) => {
             const src = typeof props.src === 'string' ? props.src : ''
             const alt = typeof props.alt === 'string' ? props.alt : ''
             const normalizedSrc = src.match(/\/api\/file\/[^\s?)]+/)?.[0] ?? src
 
-            if (isProbablyVideoUrl(src, alt) || isProbablyVideoUrl(normalizedSrc, alt)) {
+            if (
+                isProbablyVideoUrl(src, alt) ||
+                isProbablyVideoUrl(normalizedSrc, alt) ||
+                /\.mp4($|\?)/i.test(src) ||
+                /\/api\/file\/vi_/i.test(src)
+            ) {
                 return (
                     <ChatVideo
-                        src={normalizedSrc}
+                        src={normalizedSrc || src}
                         title={alt || undefined}
                     />
                 )

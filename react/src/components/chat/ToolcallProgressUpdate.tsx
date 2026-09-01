@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from 'react'
 const WAITING_ELAPSED_PATTERN = /已等待\s*(\d+)\s*秒/
 /** 去掉面向用户的内部状态字段，如（状态: running） */
 const INTERNAL_STATUS_PATTERN = /[（(]\s*状态\s*:?\s*[^）)]+[）)]/g
-const VIDEO_GENERATING_HINT = /视频生成/
+const VIDEO_GENERATING_HINT =
+  /视频生成|正在提交|正在下载|等待提交|generation|generate_video/i
 
 function parseWaitingElapsed(text: string): number | null {
   const match = text.match(WAITING_ELAPSED_PATTERN)
@@ -52,18 +53,28 @@ export default function ToolcallProgressUpdate({
   const waitStartedAtRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (initialProgress) {
-      setRawProgress(initialProgress)
-    }
+    if (!initialProgress.trim()) return
+    setRawProgress((prev) => {
+      // 恢复/开始通知不要覆盖已经在走的「已等待」
+      if (
+        parseWaitingElapsed(prev) !== null &&
+        parseWaitingElapsed(initialProgress) === null
+      ) {
+        return prev
+      }
+      return initialProgress
+    })
   }, [initialProgress])
 
   useEffect(() => {
     const handleToolCallProgress = (
       data: TEvents['Socket::Session::ToolCallProgress']
     ) => {
-      if (data.session_id === sessionId) {
-        setRawProgress(data.update)
-      }
+      if (data.session_id !== sessionId) return
+      const update = typeof data.update === 'string' ? data.update : ''
+      // 空进度只是某一步结束，整次生成可能还在跑，不能拆掉计时条
+      if (!update.trim()) return
+      setRawProgress(update)
     }
 
     eventBus.on('Socket::Session::ToolCallProgress', handleToolCallProgress)
@@ -74,24 +85,22 @@ export default function ToolcallProgressUpdate({
 
   useEffect(() => {
     const cleaned = stripInternalDetails(rawProgress)
-    if (!cleaned) {
-      waitStartedAtRef.current = null
-      setElapsedSeconds(null)
-      return
-    }
-
-    if (!isVideoGeneratingProgress(cleaned)) {
-      waitStartedAtRef.current = null
-      setElapsedSeconds(null)
+    if (!cleaned || !isVideoGeneratingProgress(cleaned)) {
       return
     }
 
     const serverElapsed = parseWaitingElapsed(cleaned)
-    if (serverElapsed !== null) {
-      // 用服务端秒数校准本地计时，之后每秒本地递增
-      waitStartedAtRef.current = Date.now() - serverElapsed * 1000
-    } else if (waitStartedAtRef.current === null) {
-      waitStartedAtRef.current = Date.now()
+    if (waitStartedAtRef.current === null) {
+      waitStartedAtRef.current =
+        Date.now() - (serverElapsed ?? 0) * 1000
+    } else if (serverElapsed !== null) {
+      const localElapsed = Math.floor(
+        (Date.now() - waitStartedAtRef.current) / 1000
+      )
+      // 只允许服务端把时间往前校准，禁止往回跳或清零
+      if (serverElapsed > localElapsed) {
+        waitStartedAtRef.current = Date.now() - serverElapsed * 1000
+      }
     }
 
     const tick = () => {
@@ -109,13 +118,14 @@ export default function ToolcallProgressUpdate({
   }, [rawProgress])
 
   const plain = stripInternalDetails(rawProgress)
-  if (!plain) return null
+  const displayElapsed =
+    elapsedSeconds ?? parseWaitingElapsed(plain) ?? 0
 
-  if (isVideoGeneratingProgress(plain)) {
-    const displayElapsed =
-      elapsedSeconds ?? parseWaitingElapsed(plain) ?? 0
+  if (displayElapsed > 0 || isVideoGeneratingProgress(plain)) {
     return <VideoProgressCard elapsedSeconds={displayElapsed} />
   }
+
+  if (!plain) return null
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-violet-200/70 bg-gradient-to-r from-violet-50 via-purple-50 to-violet-50 shadow-sm dark:border-violet-800/50 dark:from-violet-950/50 dark:via-purple-950/40 dark:to-violet-950/50">

@@ -25,10 +25,12 @@
     "videoDownload": "保存视频",
     "videoDownloadFailed": "保存失败，请长按视频选择保存",
     "tapToPlay": "点击播放视频",
-    "wechatTapToPlay": "点击用系统播放器打开",
-    "wechatOpenHint": "已在微信中打开视频，可长按保存",
-    "openVideo": "新窗口打开",
-    "videoLoadFailed": "视频加载失败，请尝试保存后播放"
+    "wechatTapToPlay": "点击播放",
+    "wechatOpenHint": "微信内请打开播放页观看；下载可点播放页上的「下载视频」",
+    "openedPlayerHint": "已打开播放页，可直接观看；需要保存时点页面上的「下载视频」",
+    "videoBuffering": "视频加载中…",
+    "openVideo": "打开播放页",
+    "videoLoadFailed": "视频无法播放，请打开播放页或下载后查看"
   },
   "thinking": {
     "title": "思考过程"

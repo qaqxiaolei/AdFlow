@@ -16,14 +16,37 @@ function withDownloadParam(url: string): string {
   return `${url}${separator}download=1`
 }
 
-async function fetchVideoBlob(url: string): Promise<Blob> {
-  const response = await fetch(withDownloadParam(url), {
-    credentials: 'same-origin',
-  })
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`)
+function withPlayerParam(url: string): string {
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}player=1`
+}
+
+function isIOS(): boolean {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
+function isMobileBrowser(): boolean {
+  return (
+    isIOS() ||
+    /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  )
+}
+
+async function fetchVideoBlob(url: string, timeoutMs = 45000): Promise<Blob> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, {
+      credentials: 'same-origin',
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    return await response.blob()
+  } finally {
+    window.clearTimeout(timer)
   }
-  return response.blob()
 }
 
 async function tryMobileShare(blob: Blob, filename: string): Promise<boolean> {
@@ -43,51 +66,61 @@ async function tryMobileShare(blob: Blob, filename: string): Promise<boolean> {
   return true
 }
 
-function triggerBlobDownload(blob: Blob, filename: string): void {
-  const objectUrl = URL.createObjectURL(blob)
+function triggerUrlDownload(url: string, filename: string): void {
   const anchor = document.createElement('a')
-  anchor.href = objectUrl
+  anchor.href = withDownloadParam(url)
   anchor.download = filename
   anchor.rel = 'noopener'
+  // 不要 target=_blank：手机上容易开空白页，看起来像「打不开」
   anchor.style.display = 'none'
   document.body.appendChild(anchor)
   anchor.click()
   document.body.removeChild(anchor)
-  URL.revokeObjectURL(objectUrl)
 }
 
-/** 微信内直接打开 mp4，系统播放器里可长按保存 */
+/** 免登录播放页，可播可下，不依赖聊天登录态 */
+export function getVideoPlayerUrl(src: string): string {
+  return withPlayerParam(resolveMediaUrl(src))
+}
+
+/** 打开播放页（手机 / 微信优先走这里，保证能看到画面） */
 export function openVideoDirectly(src: string): void {
-  const url = withDownloadParam(resolveMediaUrl(src))
-  window.location.href = url
+  window.location.href = getVideoPlayerUrl(src)
 }
 
-/** 下载或保存聊天中的生成视频，兼容 iOS / Android / 微信 */
+export type DownloadVideoResult = 'opened-player' | 'shared' | 'downloaded'
+
+/**
+ * 保存视频：
+ * - 微信 / 手机浏览器 → 打开可播放页（页内可下载）
+ * - 桌面 → 直接附件下载
+ * - iOS 桌面外再尝试系统分享
+ */
 export async function downloadVideoFile(
   src: string,
   title?: string
-): Promise<void> {
+): Promise<DownloadVideoResult> {
   const url = resolveMediaUrl(src)
   const filename = extractFilename(src, title)
 
-  // 微信里 blob 下载常失效，优先走系统播放器
-  if (isWeChatBrowser()) {
+  // 微信、手机：先打开能播的页面，避免「下载了但看不到」
+  if (isWeChatBrowser() || isMobileBrowser()) {
     openVideoDirectly(src)
-    return
+    return 'opened-player'
   }
 
-  const blob = await fetchVideoBlob(url)
+  triggerUrlDownload(url, filename)
 
-  try {
-    const shared = await tryMobileShare(blob, filename)
-    if (shared) {
-      return
-    }
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      return
+  // 桌面 Safari 等再尝试分享（通常不可用，忽略即可）
+  if (isIOS()) {
+    try {
+      const blob = await fetchVideoBlob(url)
+      const shared = await tryMobileShare(blob, filename)
+      if (shared) return 'shared'
+    } catch {
+      // ignore
     }
   }
 
-  triggerBlobDownload(blob, filename)
+  return 'downloaded'
 }

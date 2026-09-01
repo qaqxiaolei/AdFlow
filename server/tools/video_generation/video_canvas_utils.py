@@ -64,18 +64,45 @@ async def save_video_to_canvas(
         # Generate unique video ID
         video_id = generate_video_file_id()
 
-        # Download and save video
+        # Download and save video locally (faststart / poster)
         print(f"🎥 Downloading video from: {video_url}")
         mime_type, width, height, extension = await get_video_info_and_save(
             video_url, os.path.join(FILES_DIR, f"{video_id}")
         )
         filename = f"{video_id}.{extension}"
+        local_video_path = os.path.join(FILES_DIR, filename)
+        local_poster_path = os.path.join(FILES_DIR, f"{video_id}.jpg")
 
         print(f"🎥 Video saved as: {filename}, dimensions: {width}x{height}")
 
+        # Prefer Aliyun OSS public URL for frontend playback
+        file_url = f"/api/file/{filename}"
+        try:
+            from services.oss_service import is_oss_configured, upload_file_async
+
+            if is_oss_configured():
+                file_url = await upload_file_async(
+                    local_video_path,
+                    f"videos/{filename}",
+                    content_type=mime_type or "video/mp4",
+                )
+                if os.path.isfile(local_poster_path):
+                    try:
+                        await upload_file_async(
+                            local_poster_path,
+                            f"videos/{video_id}.jpg",
+                            content_type="image/jpeg",
+                        )
+                    except Exception as poster_err:
+                        print(f"[oss] poster upload skipped: {poster_err}")
+            else:
+                print("[oss] not configured, using local /api/file/ URL")
+        except Exception as oss_err:
+            print(f"[oss] upload failed, fallback to local URL: {oss_err}")
+            file_url = f"/api/file/{filename}"
+
         # Create file data
         file_id = generate_video_file_id()
-        file_url = f"/api/file/{filename}"
 
         file_data: Dict[str, Any] = {
             "mimeType": mime_type,
@@ -123,9 +150,13 @@ async def send_tool_call_progress(
     """Push tool progress text to chat UI (ToolcallProgressUpdate)."""
     if not session_id or not tool_call_id:
         return
-    update_session_progress(
-        session_id, last_progress=update, pending_type="tool"
-    )
+    if update:
+        update_session_progress(
+            session_id, last_progress=update, pending_type="tool"
+        )
+    else:
+        # 空字符串只表示这一小步结束，不要把可恢复的「已等待」进度清掉
+        update_session_progress(session_id, pending_type="tool")
     await send_to_websocket(session_id, {
         "type": "tool_call_progress",
         "session_id": session_id,
@@ -200,11 +231,12 @@ def format_user_video_error(error_message: str) -> str:
     return "视频生成失败，请稍后重试"
 
 
-def format_video_success_message(filename: str) -> str:
-    """Format success message for video generation"""
+def format_video_success_message(filename: str, file_url: Optional[str] = None) -> str:
+    """Format success message for video generation (OSS URL or local /api/file/)."""
+    display_url = file_url or f"/api/file/{filename}"
     return (
         f"video generated successfully "
-        f"![video_id: {filename}](/api/file/{filename})"
+        f"![video_id: {filename}]({display_url})"
     )
 
 
@@ -248,9 +280,9 @@ async def process_video_result(
         )
 
         provider_info = f" using {provider_name}" if provider_name else ""
-        print(f"🎥 Video generation completed{provider_info}: {filename}")
+        print(f"🎥 Video generation completed{provider_info}: {filename} -> {file_data['dataURL']}")
         await send_tool_call_progress(session_id, tool_call_id, "")
-        return format_video_success_message(filename)
+        return format_video_success_message(filename, file_data["dataURL"])
 
     except Exception as e:
         error_message = str(e)

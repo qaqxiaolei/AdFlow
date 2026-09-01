@@ -45,7 +45,9 @@ function prepareVideoForMobile(video: HTMLVideoElement) {
   video.setAttribute('playsinline', '')
   video.setAttribute('webkit-playsinline', 'true')
   video.setAttribute('x5-playsinline', 'true')
-  video.setAttribute('preload', 'metadata')
+  video.setAttribute('x5-video-player-type', 'h5-page')
+  video.setAttribute('x5-video-player-fullscreen', 'false')
+  video.preload = 'metadata'
 }
 
 export default function ChatVideo({ src, title, className }: ChatVideoProps) {
@@ -54,50 +56,19 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
   const playWatchRef = useRef<number | null>(null)
   const inWeChat = isWeChatBrowser()
   const avoidInline = shouldAvoidInlineVideo()
+  const playAttemptedRef = useRef(false)
   const [downloading, setDownloading] = useState(false)
   const [started, setStarted] = useState(false)
+  const [buffering, setBuffering] = useState(false)
   const [frameVisible, setFrameVisible] = useState(false)
   const [hasError, setHasError] = useState(false)
   const [posterOk, setPosterOk] = useState(true)
-  const [checking, setChecking] = useState(() => !shouldAvoidInlineVideo())
 
   const playbackSrc = useMemo(() => toPlaybackUrl(src), [src])
   const videoUrl = useMemo(() => resolveMediaUrl(playbackSrc), [playbackSrc])
   const poster = useMemo(() => resolveMediaUrl(toPosterUrl(src)), [src])
   const showPoster = posterOk && poster !== videoUrl && !frameVisible
-  const showPlayOverlay = !hasError && !started && !checking
-
-  useEffect(() => {
-    if (avoidInline) {
-      setChecking(false)
-      setHasError(false)
-      return
-    }
-
-    let cancelled = false
-    setChecking(true)
-    setHasError(false)
-
-    fetch(videoUrl, {
-      method: 'GET',
-      headers: { Range: 'bytes=0-0' },
-      credentials: 'same-origin',
-    })
-      .then((res) => {
-        if (cancelled) return
-        if (res.status === 404) setHasError(true)
-      })
-      .catch(() => {
-        // 探测失败不代表文件不可播
-      })
-      .finally(() => {
-        if (!cancelled) setChecking(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [videoUrl, avoidInline])
+  const showPlayOverlay = !hasError && !started && !buffering
 
   useEffect(() => {
     if (avoidInline) return
@@ -126,11 +97,9 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
     if (downloading) return
 
     setDownloading(true)
+    const stopLoading = window.setTimeout(() => setDownloading(false), 10000)
     try {
       await downloadVideoFile(playbackSrc, title)
-      if (inWeChat) {
-        toast.message(t('chat:messages.wechatOpenHint', '已在微信中打开视频，可长按保存'))
-      }
     } catch (error) {
       console.error('Video download failed:', error)
       toast.error(t('chat:messages.videoDownloadFailed'))
@@ -140,6 +109,7 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
         // ignore
       }
     } finally {
+      window.clearTimeout(stopLoading)
       setDownloading(false)
     }
   }
@@ -151,44 +121,56 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
   }
 
   const handlePlay = async () => {
-    if (hasError) return
+    playAttemptedRef.current = true
 
-    if (avoidInline) {
+    // 内联不稳定时（尤其微信），直接进专用播放页
+    if (avoidInline || inWeChat) {
       openVideoDirectly(playbackSrc)
       return
     }
 
     const video = videoRef.current
-    if (!video) return
+    if (!video) {
+      openVideoDirectly(playbackSrc)
+      return
+    }
+
+    setBuffering(true)
+    setHasError(false)
+    clearPlayWatch()
+    // 手机缓冲慢，给够时间；超时再进播放页
+    playWatchRef.current = window.setTimeout(() => {
+      const current = videoRef.current
+      if (!current || current.currentTime < 0.05) {
+        openVideoDirectly(playbackSrc)
+      }
+    }, 45000)
 
     try {
       prepareVideoForMobile(video)
       if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
         video.load()
       }
+      // 先静音以通过自动播放策略，再尝试取消静音
+      video.muted = true
       await video.play()
+      video.muted = false
       setStarted(true)
-
-      clearPlayWatch()
-      playWatchRef.current = window.setTimeout(() => {
-        if (!frameVisible) {
-          setHasError(true)
-          toast.error(
-            t('chat:messages.videoLoadFailed', '视频无法播放，请尝试在新窗口打开')
-          )
-        }
-      }, 4000)
+      setHasError(false)
     } catch (error) {
       console.warn('Video play failed:', error)
-      setHasError(true)
-      toast.error(t('chat:messages.videoLoadFailed', '视频加载失败，请尝试保存后播放'))
+      clearPlayWatch()
+      setStarted(false)
+      setBuffering(false)
+      openVideoDirectly(playbackSrc)
     }
   }
 
   return (
-    <span
+    <div
       className={cn(
-        'group relative block h-[220px] w-full overflow-hidden rounded-md my-2 last:mb-4 bg-zinc-800',
+        'group relative my-2 w-full max-w-[240px] overflow-hidden rounded-xl',
+        'aspect-[9/16] bg-gradient-to-b from-zinc-600 via-zinc-800 to-zinc-950',
         className
       )}
     >
@@ -207,39 +189,59 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
           ref={videoRef}
           className={cn(
             'absolute inset-0 z-[2] h-full w-full object-cover bg-transparent',
-            frameVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            // 已开始播放就显示控件区域，不再一直 opacity-0 变成「打不开」
+            started || frameVisible
+              ? 'opacity-100'
+              : 'opacity-0 pointer-events-none'
           )}
           controls={started}
           playsInline
           preload="metadata"
           poster={poster !== videoUrl ? poster : undefined}
           src={videoUrl}
+          onWaiting={() => setBuffering(true)}
+          onPlaying={() => {
+            setBuffering(false)
+            setStarted(true)
+            setFrameVisible(true)
+            clearPlayWatch()
+          }}
           onTimeUpdate={() => {
             const video = videoRef.current
             if (video && video.currentTime > 0.05) {
               setFrameVisible(true)
+              setBuffering(false)
               clearPlayWatch()
             }
           }}
-          onPlay={() => setStarted(true)}
+          onPlay={() => {
+            setStarted(true)
+            setBuffering(false)
+          }}
           onError={() => {
             clearPlayWatch()
-            setHasError(true)
+            if (playAttemptedRef.current) {
+              setBuffering(false)
+              setHasError(true)
+            }
           }}
           {...(title ? { title } : {})}
         />
       )}
 
-      {checking && (
-        <div className="absolute inset-0 z-[3] flex items-center justify-center bg-zinc-800/80">
-          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      {buffering && (
+        <div className="absolute inset-0 z-[3] flex flex-col items-center justify-center gap-2 bg-zinc-900/60">
+          <Loader2 className="size-8 animate-spin text-white" />
+          <span className="text-xs text-white/90">
+            {t('chat:messages.videoBuffering', '视频加载中…')}
+          </span>
         </div>
       )}
 
       {showPlayOverlay && (
         <button
           type="button"
-          className="absolute inset-0 z-[4] flex flex-col items-center justify-center gap-2 touch-manipulation"
+          className="absolute inset-0 z-[4] flex flex-col items-center justify-center gap-3 touch-manipulation"
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
@@ -247,19 +249,17 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
           }}
           aria-label={t('chat:messages.tapToPlay', '点击播放视频')}
         >
-          <span className="flex size-14 items-center justify-center rounded-full bg-black/55 shadow-lg">
-            <Play className="size-7 fill-white text-white ml-0.5" />
+          <span className="flex size-16 items-center justify-center rounded-full bg-white shadow-xl">
+            <Play className="size-8 fill-zinc-900 text-zinc-900 ml-0.5" />
           </span>
-          <span className="text-xs font-medium text-white drop-shadow-sm px-3 text-center">
-            {inWeChat
-              ? t('chat:messages.wechatTapToPlay', '点击用系统播放器打开')
-              : t('chat:messages.tapToPlay', '点击播放视频')}
+          <span className="rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
+            {t('chat:messages.tapToPlay', '点击播放视频')}
           </span>
         </button>
       )}
 
       {hasError && (
-        <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-zinc-800 px-4 text-center text-sm text-muted-foreground">
+        <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-zinc-900 px-4 text-center text-sm text-white">
           <p>{t('chat:messages.videoLoadFailed', '视频无法播放')}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Button type="button" size="sm" variant="outline" onClick={handleDownload}>
@@ -267,7 +267,7 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
             </Button>
             <Button type="button" size="sm" variant="secondary" onClick={handleOpenExternal}>
               <ExternalLink className="size-4 mr-1" />
-              {t('chat:messages.openVideo', '新窗口打开')}
+              {t('chat:messages.openVideo', '打开播放页')}
             </Button>
           </div>
         </div>
@@ -279,11 +279,7 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
         variant="secondary"
         disabled={downloading}
         onClick={handleDownload}
-        className={cn(
-          'absolute top-2 right-2 z-[6] h-9 gap-1.5 px-3 shadow-md',
-          'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
-          'transition-opacity touch-manipulation'
-        )}
+        className="absolute top-2 right-2 z-[6] h-9 gap-1.5 px-3 shadow-md touch-manipulation"
         aria-label={t('chat:messages.videoDownload')}
       >
         {downloading ? (
@@ -291,10 +287,10 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
         ) : (
           <Download className="size-4" />
         )}
-        <span className="text-xs font-medium sm:hidden">
+        <span className="text-xs font-medium">
           {t('chat:messages.videoDownload')}
         </span>
       </Button>
-    </span>
+    </div>
   )
 }

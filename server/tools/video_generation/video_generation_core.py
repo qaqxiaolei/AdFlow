@@ -92,7 +92,7 @@ async def generate_video_with_provider(
         # 发送开始通知
         await send_video_start_notification(
             session_id,
-            f"Starting video generation using {model_name} via {provider_name}..."
+            "正在生成视频...",
         )
         await send_tool_call_progress(
             session_id, tool_call_id, "正在提交视频生成任务..."

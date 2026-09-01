@@ -18,14 +18,18 @@ export function isProbablyVideoUrl(src: string, alt?: string): boolean {
   if (/\.(mp4|webm|mov)(\?|$)/i.test(src)) return true
   if (/\/api\/file\/vi_/i.test(src)) return true
   if (/agnes-ai\.space|agnes-aigc/i.test(src)) return true
+  if (/aliyuncs\.com|\.oss-/i.test(src) && /\.(mp4|webm|mov)(\?|$)/i.test(src)) {
+    return true
+  }
   if (/\/api\/file\//i.test(src) && !/\.(png|jpe?g|gif|webp|svg|ico)(\?|$)/i.test(src)) {
     return true
   }
   return false
 }
 
+/** 始终在页面内播放。微信里跳转到 mp4 会变成系统播放器，控件错乱且播不了 */
 export function shouldAvoidInlineVideo(): boolean {
-  return isWeChatBrowser() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  return false
 }
 
 export function normalizeVideoKey(url: string): string {

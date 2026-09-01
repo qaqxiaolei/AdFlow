@@ -35,4 +35,5 @@ bcrypt
 PyJWT
 qrcode
 wechatpayv3
+oss2
 python-dotenv
