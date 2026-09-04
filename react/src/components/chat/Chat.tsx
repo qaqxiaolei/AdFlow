@@ -43,7 +43,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useQueryClient } from '@tanstack/react-query'
 import MixedContent, { MixedContentImages, MixedContentText } from './Message/MixedContent'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { stripDuplicateVideoMarkdown } from '@/lib/resolveMediaUrl'
+import { stripDuplicateVideoMarkdown, isProbablyVideoUrl } from '@/lib/resolveMediaUrl'
 
 
 type ChatInterfaceProps = {
@@ -93,6 +93,81 @@ function countSessionVideos(messages: Message[]): number {
     }
 
     return urls.size
+}
+
+const VIDEO_MD_FIND_RE =
+    /!\[([^\]]*)\]\(([^)]+)\)/g
+
+function extractVideoMarkdowns(text: string): string[] {
+    const found: string[] = []
+    VIDEO_MD_FIND_RE.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = VIDEO_MD_FIND_RE.exec(text)) !== null) {
+        if (isProbablyVideoUrl(match[2], match[1])) {
+            found.push(match[0])
+        }
+    }
+    return found
+}
+
+function isStandaloneVideoMessage(content: string): boolean {
+    const trimmed = content.trim()
+    const videos = extractVideoMarkdowns(trimmed)
+    if (videos.length !== 1) return false
+    return trimmed === videos[0]
+}
+
+/** 插到「已生成完成」后、「视频信息」前 */
+function injectVideoAfterHeadline(text: string, videoMarkdown: string): string {
+    const url = videoMarkdown.match(/\(([^)]+)\)/)?.[1]
+    if (url && text.includes(url)) return text
+
+    const blocks = text
+        .split(/\n{2,}/)
+        .map((b) => b.trim())
+        .filter(Boolean)
+    if (blocks.length === 0) return videoMarkdown
+
+    let leadIdx = 0
+    for (let i = 0; i < blocks.length; i++) {
+        if (/完成|已生成|successfully|video generated/i.test(blocks[i])) {
+            leadIdx = i
+            break
+        }
+    }
+
+    return [
+        ...blocks.slice(0, leadIdx + 1),
+        videoMarkdown,
+        ...blocks.slice(leadIdx + 1),
+    ].join('\n\n')
+}
+
+function collectVideoMarkdownsFromMessages(messages: Message[]): string[] {
+    const videos: string[] = []
+    const seen = new Set<string>()
+
+    const pushUnique = (md: string) => {
+        const url = md.match(/\(([^)]+)\)/)?.[1] ?? md
+        const key = url.replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
+        if (seen.has(key)) return
+        seen.add(key)
+        videos.push(md)
+    }
+
+    for (const message of messages) {
+        if (typeof message.content === 'string') {
+            extractVideoMarkdowns(message.content).forEach(pushUnique)
+        }
+        if (message.role === 'assistant' && message.tool_calls) {
+            for (const toolCall of message.tool_calls) {
+                if (typeof toolCall.result === 'string') {
+                    extractVideoMarkdowns(toolCall.result).forEach(pushUnique)
+                }
+            }
+        }
+    }
+    return videos
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -764,8 +839,82 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }, [])
 
     const messagesForDisplay = useMemo(() => {
+        const availableVideos = collectVideoMarkdownsFromMessages(messages)
+        const usedVideoKeys = new Set<string>()
+        const videoKey = (md: string) => {
+            const url = md.match(/\(([^)]+)\)/)?.[1] ?? md
+            return url.replace(/^https?:\/\/[^/]+/i, '').replace(/[?#].*$/, '')
+        }
+
+        // 把成片嵌进「已生成完成」后的文案里，并隐藏单独的视频-only 消息
+        const withEmbedded = messages.flatMap((message) => {
+            if (
+                message.role === 'assistant' &&
+                typeof message.content === 'string' &&
+                isStandaloneVideoMessage(message.content)
+            ) {
+                // 留给后面的完成文案嵌入；若没有完成文案再单独显示
+                return []
+            }
+
+            if (
+                message.role === 'assistant' &&
+                typeof message.content === 'string' &&
+                !message.tool_calls &&
+                /完成|已生成|宣传片|视频信息/i.test(message.content)
+            ) {
+                let content = message.content
+                for (const videoMd of availableVideos) {
+                    const key = videoKey(videoMd)
+                    if (usedVideoKeys.has(key)) continue
+                    if (content.includes(videoMd.match(/\(([^)]+)\)/)?.[1] ?? '')) {
+                        usedVideoKeys.add(key)
+                        continue
+                    }
+                    content = injectVideoAfterHeadline(content, videoMd)
+                    usedVideoKeys.add(key)
+                }
+                return content === message.content
+                    ? [message]
+                    : [{ ...message, content }]
+            }
+
+            return [message]
+        })
+
+        // 没有对应完成文案时，仍展示未嵌入的成片，避免丢视频
+        const leftovers = availableVideos.filter(
+            (md) => !usedVideoKeys.has(videoKey(md))
+        )
+        if (leftovers.length > 0) {
+            // 插到最后一条「完成」文案后；若没有则追加在末尾
+            let inserted = false
+            for (let i = withEmbedded.length - 1; i >= 0; i--) {
+                const msg = withEmbedded[i]
+                if (
+                    msg.role === 'assistant' &&
+                    typeof msg.content === 'string' &&
+                    /完成|已生成|宣传片/i.test(msg.content)
+                ) {
+                    let content = msg.content
+                    for (const videoMd of leftovers) {
+                        content = injectVideoAfterHeadline(content, videoMd)
+                        usedVideoKeys.add(videoKey(videoMd))
+                    }
+                    withEmbedded[i] = { ...msg, content }
+                    inserted = true
+                    break
+                }
+            }
+            if (!inserted) {
+                for (const videoMd of leftovers) {
+                    withEmbedded.push({ role: 'assistant', content: videoMd })
+                }
+            }
+        }
+
         const seen = new Set<string>()
-        return messages.map((message) => {
+        return withEmbedded.map((message) => {
             if (typeof message.content !== 'string' || message.role === 'tool') {
                 return message
             }

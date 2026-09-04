@@ -24,12 +24,14 @@
     "showLess": "Show Less",
     "videoDownload": "Save video",
     "videoDownloadFailed": "Save failed. Long-press the video to save it.",
+    "videoDownloadStarted": "Download started",
+
     "tapToPlay": "Tap to play",
     "wechatTapToPlay": "Tap to play",
     "wechatOpenHint": "Open the player page to watch. Use Download on that page to save.",
     "openedPlayerHint": "Opened the player page. Watch there, or tap Download to save.",
     "videoBuffering": "Loading video…",
-    "openVideo": "Open player",
+    "openVideo": "Open video",
     "videoLoadFailed": "Video failed to play. Open the player page or download it."
   },
   "thinking": {

@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { downloadVideoFile, openVideoDirectly } from '@/lib/downloadVideo'
 import {
-  isWeChatBrowser,
   resolveMediaUrl,
   shouldAvoidInlineVideo,
 } from '@/lib/resolveMediaUrl'
@@ -54,7 +53,6 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
   const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const playWatchRef = useRef<number | null>(null)
-  const inWeChat = isWeChatBrowser()
   const avoidInline = shouldAvoidInlineVideo()
   const playAttemptedRef = useRef(false)
   const [downloading, setDownloading] = useState(false)
@@ -97,9 +95,14 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
     if (downloading) return
 
     setDownloading(true)
-    const stopLoading = window.setTimeout(() => setDownloading(false), 10000)
+    const stopLoading = window.setTimeout(() => setDownloading(false), 8000)
     try {
-      await downloadVideoFile(playbackSrc, title)
+      const result = await downloadVideoFile(playbackSrc, title)
+      if (result === 'downloaded') {
+        toast.success(
+          t('chat:messages.videoDownloadStarted', '已开始下载')
+        )
+      }
     } catch (error) {
       console.error('Video download failed:', error)
       toast.error(t('chat:messages.videoDownloadFailed'))
@@ -123,14 +126,9 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
   const handlePlay = async () => {
     playAttemptedRef.current = true
 
-    // 内联不稳定时（尤其微信），直接进专用播放页
-    if (avoidInline || inWeChat) {
-      openVideoDirectly(playbackSrc)
-      return
-    }
-
     const video = videoRef.current
-    if (!video) {
+    if (!video || avoidInline) {
+      // 无法内联时直接打开原始视频文件，不进自定义播放页
       openVideoDirectly(playbackSrc)
       return
     }
@@ -138,11 +136,11 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
     setBuffering(true)
     setHasError(false)
     clearPlayWatch()
-    // 手机缓冲慢，给够时间；超时再进播放页
     playWatchRef.current = window.setTimeout(() => {
       const current = videoRef.current
       if (!current || current.currentTime < 0.05) {
-        openVideoDirectly(playbackSrc)
+        setBuffering(false)
+        setHasError(true)
       }
     }, 45000)
 
@@ -151,7 +149,6 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
       if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
         video.load()
       }
-      // 先静音以通过自动播放策略，再尝试取消静音
       video.muted = true
       await video.play()
       video.muted = false
@@ -162,7 +159,7 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
       clearPlayWatch()
       setStarted(false)
       setBuffering(false)
-      openVideoDirectly(playbackSrc)
+      setHasError(true)
     }
   }
 
@@ -267,7 +264,7 @@ export default function ChatVideo({ src, title, className }: ChatVideoProps) {
             </Button>
             <Button type="button" size="sm" variant="secondary" onClick={handleOpenExternal}>
               <ExternalLink className="size-4 mr-1" />
-              {t('chat:messages.openVideo', '打开播放页')}
+              {t('chat:messages.openVideo', '打开视频')}
             </Button>
           </div>
         </div>

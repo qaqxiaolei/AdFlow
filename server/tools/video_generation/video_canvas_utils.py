@@ -78,8 +78,14 @@ async def save_video_to_canvas(
         # Prefer Aliyun OSS public URL for frontend playback
         file_url = f"/api/file/{filename}"
         try:
-            from services.oss_service import is_oss_configured, upload_file_async
+            from services.oss_service import (
+                is_oss_configured,
+                log_oss_status,
+                missing_oss_keys,
+                upload_file_async,
+            )
 
+            log_oss_status()
             if is_oss_configured():
                 file_url = await upload_file_async(
                     local_video_path,
@@ -94,12 +100,27 @@ async def save_video_to_canvas(
                             content_type="image/jpeg",
                         )
                     except Exception as poster_err:
-                        print(f"[oss] poster upload skipped: {poster_err}")
+                        print(f"[oss] ⚠️ 封面上传失败（视频已上传）: {poster_err}")
             else:
-                print("[oss] not configured, using local /api/file/ URL")
+                missing = ", ".join(missing_oss_keys())
+                print(
+                    f"[oss] ❌ 未配置 OSS（缺少 {missing}），"
+                    f"回退本地地址 /api/file/{filename} — "
+                    "手机访问云服务器时通常播不了这条视频"
+                )
         except Exception as oss_err:
-            print(f"[oss] upload failed, fallback to local URL: {oss_err}")
+            print(f"[oss] ❌ 上传失败，回退本地 /api/file/{filename}")
+            print(f"[oss] 原因: {oss_err}")
+            traceback.print_exc()
             file_url = f"/api/file/{filename}"
+
+        try:
+            from services.oss_service import describe_playback_url
+
+            label, _ = describe_playback_url(file_url)
+            print(f"[oss] 最终播放地址（{label}）: {file_url}")
+        except Exception:
+            print(f"[oss] 最终播放地址: {file_url}")
 
         # Create file data
         file_id = generate_video_file_id()

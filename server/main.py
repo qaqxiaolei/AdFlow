@@ -108,6 +108,12 @@ async def lifespan(app: FastAPI):
     await initialize()
     await tool_service.initialize()
     await _warmup_agents()
+    try:
+        from services.oss_service import log_oss_status
+
+        log_oss_status(force=True)
+    except Exception as e:
+        print(f"[oss] 启动自检失败: {e}")
     yield
     # onshutdown
 
