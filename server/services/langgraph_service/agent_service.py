@@ -55,7 +55,7 @@ async def langgraph_multi_agent(
     tool_list: List[ToolInfoJson],
     system_prompt: Optional[str] = None,
     user_id: Optional[str] = None,
-) -> None:
+) -> tuple[List[Dict[str, Any]], Optional[str]]:
     """多智能体处理函数
 
     Args:
@@ -130,10 +130,12 @@ async def langgraph_multi_agent(
         await processor.process_stream(swarm, fixed_messages, context)
 
         monitor.log_timings(session_id)
+        return list(processor.latest_oai_messages), None
 
     except Exception as e:
         monitor.log_timings(session_id)
         await _handle_error(e, session_id)
+        return [], str(e)
 
 
 def _create_text_model(text_model: ModelInfo) -> Any:

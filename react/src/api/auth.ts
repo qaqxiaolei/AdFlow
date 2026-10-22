@@ -15,6 +15,7 @@ export interface UserInfo {
   image_url?: string
   provider?: string
   credits?: number
+  video_count?: number
   created_at?: string
   updated_at?: string
 }

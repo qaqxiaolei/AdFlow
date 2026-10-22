@@ -345,14 +345,16 @@ async def get_video_info_and_save(
         await out_file.write(video_content)
     print("🎥 Video saved to", temp_path)
 
-    # faststart + 必要时转 H.264，并抽取封面
+    # faststart + 必要时转 H.264，烧入 AI 生成标记，并抽取封面
     try:
+        from tools.video_generation.ai_label import apply_ai_generated_label
         from tools.video_generation.mp4_faststart import (
             ensure_mobile_playable_mp4,
             extract_video_poster,
         )
 
         await asyncio.to_thread(ensure_mobile_playable_mp4, temp_path)
+        await asyncio.to_thread(apply_ai_generated_label, temp_path)
         poster_path = f"{file_path_without_extension}.jpg"
         await asyncio.to_thread(extract_video_poster, temp_path, poster_path)
     except Exception as postprocess_error:

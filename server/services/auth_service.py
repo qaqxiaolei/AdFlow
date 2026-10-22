@@ -242,6 +242,7 @@ def user_public_dict(row: Dict[str, Any]) -> Dict[str, Any]:
         "phone": phone,
         "email": "",
         "credits": float(row.get("credits") or 0),
+        "video_count": int(row.get("video_count") or 0),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
     }

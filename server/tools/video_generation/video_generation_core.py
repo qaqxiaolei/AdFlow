@@ -118,13 +118,21 @@ async def generate_video_with_provider(
             **kwargs
         )
         # 处理视频结果（保存、更新画布、通知前端）
-        return await process_video_result(
+        result = await process_video_result(
             video_url=video_url,
             session_id=session_id,
             canvas_id=canvas_id,
             provider_name=f"{model_name} ({provider_name})",
             tool_call_id=tool_call_id,
         )
+        if user_id:
+            try:
+                from services.db_service import db_service
+                video_count = await db_service.increment_user_video_count(user_id)
+                print(f"🎥 User {user_id} video_count -> {video_count}")
+            except Exception as count_err:
+                print(f"🎥 Failed to increment video_count for {user_id}: {count_err}")
+        return result
     except Exception as e:
         if credits_deducted and user_id:
             try:

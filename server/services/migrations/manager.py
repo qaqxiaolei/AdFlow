@@ -7,10 +7,11 @@ from services.migrations.v4_add_session_id_to_canvases import V4AddSessionIdToCa
 from services.migrations.v5_add_users import V5AddUsers
 from services.migrations.v6_scope_canvases_by_user import V6ScopeCanvasesByUser
 from services.migrations.v7_add_payment_orders import V7AddPaymentOrders
+from services.migrations.v8_add_user_video_count import V8AddUserVideoCount
 from . import Migration
 
 # Database version
-CURRENT_VERSION = 7
+CURRENT_VERSION = 8
 
 ALL_MIGRATIONS = [
     {
@@ -40,6 +41,10 @@ ALL_MIGRATIONS = [
     {
         'version': 7,
         'migration': V7AddPaymentOrders,
+    },
+    {
+        'version': 8,
+        'migration': V8AddUserVideoCount,
     },
 ]
 class MigrationManager:

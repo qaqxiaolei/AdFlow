@@ -647,6 +647,33 @@ class DatabaseService:
             await db.commit()
             return {"credits": new_balance}
 
+    async def increment_user_video_count(
+        self, user_id: str, amount: int = 1
+    ) -> int:
+        """成功生成视频后累加 users.video_count，返回累加后的数量。"""
+        if amount <= 0:
+            raise ValueError("累加数量必须大于 0")
+        async with aiosqlite.connect(self.db_path, timeout=30) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA busy_timeout=30000")
+            cursor = await db.execute(
+                """
+                UPDATE users
+                SET video_count = COALESCE(video_count, 0) + ?,
+                    updated_at = STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'now')
+                WHERE id = ?
+                """,
+                (amount, user_id),
+            )
+            if cursor.rowcount == 0:
+                raise ValueError("用户不存在")
+            await db.commit()
+            cursor = await db.execute(
+                "SELECT video_count FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            return int(row[0] or 0)
+
     # ─── Payment orders (WeChat recharge) ─────────────────────────────────
 
     async def create_payment_order(
