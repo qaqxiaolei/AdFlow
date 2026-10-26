@@ -82,6 +82,8 @@ def resolve_video_provider(
         return explicit_provider
 
     normalized = model_name.lower()
+    if normalized.startswith("berry"):
+        return "mulerouter"
     if "seedance" in normalized or normalized.startswith("doubao-"):
         return "volces"
 

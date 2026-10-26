@@ -27,8 +27,8 @@ class PlannerAgentConfig(BaseAgentConfig):
             视频时长规则：
             - 所有视频时长 ≤ 15秒，默认15秒
             视频画质与速度规则：
-            - 默认单个视频使用 1080p、duration=15
-            - 用户需要生成 2 个视频（如写实+仿真人两种风格）时，quantity 设为 2，可用 480p 以加快生成
+            - 默认单个视频使用 480p、duration=15
+            - 用户需要生成 2 个视频（如写实+仿真人两种风格）时，quantity 设为 2，分辨率仍用 480p
             - 优先 transfer 到 image_video_creator 生成，避免额外的 write_plan 或搜索步骤
             """
 

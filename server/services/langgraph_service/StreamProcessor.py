@@ -186,6 +186,7 @@ class StreamProcessor:
         # 需要确认的工具列表
         TOOLS_REQUIRING_CONFIRMATION = {
             'generate_video_by_agnes',
+            'generate_video_by_berry',
         }
 
         for tool_call in self.tool_calls:

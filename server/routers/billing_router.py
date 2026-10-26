@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from routers.auth_router import get_current_user_id
+from services.billing_service import consume_generation_credits
 from services.db_service import db_service
 from services.wechat_pay_service import (
     WECHAT_NOTIFY_URL,
@@ -32,10 +33,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 RECHARGE_PACKAGES: List[Dict] = [
-    {"id": "pack_100", "credits": 180, "price_cny": 19, "label": "基础包"},
-    {"id": "pack_300", "credits": 680, "price_cny": 59, "label": "进阶包"},
-    {"id": "pack_1000", "credits": 1200, "price_cny": 99, "label": "专业包"},
+    {"id": "pack_1", "credits": 180, "price_cny": 19, "label": "基础包"},
+    {"id": "pack_2", "credits": 680, "price_cny": 59, "label": "进阶包"},
+    {"id": "pack_3", "credits": 1200, "price_cny": 99, "label": "专业包"},
 ]
+
+
+class ConsumeCreditsRequest(BaseModel):
+    kind: str = Field(..., description="image 或 video")
+    model: str = Field(default="", description="模型名，写入积分流水")
+    quantity: int = Field(default=1, description="生成数量，1 或 2")
 
 
 class CreateWechatOrderRequest(BaseModel):
@@ -173,6 +180,21 @@ def _append_query(url: str, **params: str) -> str:
     query = dict(parse_qsl(parsed.query, keep_blank_values=True))
     query.update({k: v for k, v in params.items() if v is not None})
     return urlunparse(parsed._replace(query=urlencode(query)))
+
+
+@router.post("/consume")
+async def consume_credits(
+    body: ConsumeCreditsRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    """扣一次图片或视频生成积分。金额由服务端按类型和数量计算。"""
+    try:
+        return await consume_generation_credits(
+            user_id, body.kind, body.model, body.quantity
+        )
+    except ValueError as exc:
+        status = 404 if str(exc) == "用户不存在" else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
 
 
 @router.get("/getBalance")

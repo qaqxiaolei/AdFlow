@@ -11,7 +11,8 @@ import {
 import { cn, dataURLToFile } from '@/lib/utils'
 import { Message, MessageContent, Model } from '@/types/types'
 import { ModelInfo, ToolInfo } from '@/api/model'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { consumeGenerationCredits } from '@/api/billing'
 import { useDrop } from 'ahooks'
 import { produce } from 'immer'
 import {
@@ -109,6 +110,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
   const { textModel, selectedTools, generationMode, setGenerationMode } =
     useConfigs()
   const { balance } = useBalance()
+  const queryClient = useQueryClient()
   const [prompt, setPrompt] = useState('')
   const [isComposing, setIsComposing] = useState(false)
   const textareaRef = useRef<TextAreaRef>(null)
@@ -256,6 +258,23 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
       toast.error(t('chat:textarea.enterPrompt'))
       return
     }
+    try {
+      await consumeGenerationCredits(
+        generationMode,
+        modeTools[0]?.id || '',
+        quantity
+      )
+      await queryClient.invalidateQueries({ queryKey: ['balance'] })
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t('chat:insufficientBalance'),
+        {
+          description: <RechargeContent />,
+          duration: 10000,
+        }
+      )
+      return
+    }
     // 如非默认值，请添加宽高比和数量信息
     let additionalInfo = ''
     if (selectedAspectRatio !== 'auto') {
@@ -325,6 +344,7 @@ const ChatTextarea: React.FC<ChatTextareaProps> = ({
     openAuthDialog,
     balance,
     RechargeContent,
+    queryClient,
   ])
 
   // Drop Area

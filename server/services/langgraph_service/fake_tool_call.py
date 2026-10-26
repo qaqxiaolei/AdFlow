@@ -12,8 +12,8 @@ _FAKE_TOOL_CALL_RE = re.compile(
     | <\s*/\s*tool_call\s*>
     | <\s*function\s*=
     | <\s*tool\s*=
-    | \binvoke\s+generate_(?:video|image)_by_agnes\b
-    | \bcall\s+generate_(?:video|image)_by_agnes\b
+    | \binvoke\s+generate_(?:video|image)_by_(?:agnes|berry)\b
+    | \bcall\s+generate_(?:video|image)_by_(?:agnes|berry)\b
     """,
     re.IGNORECASE | re.VERBOSE,
 )
@@ -32,7 +32,7 @@ RETRY_CORRECTION_MESSAGE = (
     "系统提示：你刚才用纯文本写出了 tool_call / function 标签，"
     "这不会真正执行任何工具，用户也看不到生成结果。"
     "请立刻通过 function call 接口调用对应工具"
-    "（视频用 generate_video_by_agnes，图像用 generate_image_by_agnes），"
+    "（视频用本次工具列表中的 generate_video_by_agnes 或 generate_video_by_berry，图像用 generate_image_by_agnes），"
     "并填写完整参数（至少包含 prompt）。"
     "禁止再输出任何 <tool_call>、<function=...> 或类似 XML/Markdown 伪调用。"
     "</hide_in_user_ui>"

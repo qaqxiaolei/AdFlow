@@ -12,6 +12,7 @@ from ..video_providers.video_base_provider import (
 )
 # 导入 provider 以确保自动注册（请勿删除）
 from ..video_providers.volces_provider import VolcesVideoProvider  # type: ignore
+from ..video_providers.mulerouter_provider import MuleRouterVideoProvider  # type: ignore
 # Agnes 原生视频 provider 仍注册，供可选回退；主路径 generate_video_by_agnes 使用 volces
 from ..video_providers.agnes_provider import AgnesVideoProvider  # type: ignore
 from .video_canvas_utils import (
@@ -64,18 +65,8 @@ async def generate_video_with_provider(
     print(f'🛠️ canvas_id {canvas_id} session_id {session_id}')
     # 将 tool_call_id 注入上下文
     ctx['tool_call_id'] = tool_call_id
-    credits_deducted = False
     try:
-        # 登录用户生成视频前校验并预扣积分
-        if user_id:
-            from services.auth_service import VIDEO_CREDIT_COST
-            from services.db_service import db_service
-            await db_service.adjust_user_credits(
-                user_id, -VIDEO_CREDIT_COST, f"video:{model_name}"
-            )
-            credits_deducted = True
-            print(f"💳 Deducted {VIDEO_CREDIT_COST} credits from user {user_id}")
-
+        # 积分由前端发送时调用 POST /api/billing/consume 扣除
         # 确定使用哪个 provider
         model_info_list: List[ModelInfo] = cast(
             List[ModelInfo], ctx.get('model_info', {}).get(model_name, []))
@@ -134,16 +125,6 @@ async def generate_video_with_provider(
                 print(f"🎥 Failed to increment video_count for {user_id}: {count_err}")
         return result
     except Exception as e:
-        if credits_deducted and user_id:
-            try:
-                from services.auth_service import VIDEO_CREDIT_COST
-                from services.db_service import db_service
-                await db_service.adjust_user_credits(
-                    user_id, VIDEO_CREDIT_COST, f"video_refund:{model_name}"
-                )
-                print(f"💳 Refunded {VIDEO_CREDIT_COST} credits to user {user_id}")
-            except Exception as refund_err:
-                print(f"💳 Refund failed: {refund_err}")
         error_message = str(e)
         print(f"🎥 Error generating video with {model_name}: {error_message}")
         print(f"🎥 Full error traceback:")

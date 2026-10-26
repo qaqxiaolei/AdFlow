@@ -128,8 +128,9 @@ async def list_tools() -> list[ToolInfoJson]:
         if tool_info.get('provider') == 'system':
             continue
         provider = tool_info['provider']
-        provider_api_key = config[provider].get('api_key', '').strip()
-        if provider != 'comfyui' and not provider_api_key:
+        provider_config = config.get(provider) or {}
+        provider_api_key = str(provider_config.get('api_key', '')).strip()
+        if provider not in ('comfyui', 'mulerouter') and not provider_api_key:
             continue
         res.append({
             'id': tool_id,

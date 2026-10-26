@@ -5,6 +5,7 @@ from models.tool_model import ToolInfo
 from tools.write_plan import write_plan_tool
 from tools.generate_image_by_agnes import generate_image_by_agnes
 from tools.generate_video_by_agnes import generate_video_by_agnes
+from tools.generate_video_by_berry import generate_video_by_berry
 from tools.search_video_by_platform import search_video_by_platform_tool
 from services.config_service import config_service
 
@@ -22,6 +23,12 @@ TOOL_MAPPING: Dict[str, ToolInfo] = {
         "type": "video",
         "provider": "volces",
         "tool_function": generate_video_by_agnes,
+    },
+    "generate_video_by_berry": {
+        "display_name": "Berry 1.0",
+        "type": "video",
+        "provider": "mulerouter",
+        "tool_function": generate_video_by_berry,
     },
     "search_video_by_platform": {
         "display_name": "Video Search",
@@ -71,6 +78,12 @@ class ToolService:
                     for tool_id, tool_info in TOOL_MAPPING.items():
                         if tool_info.get("provider") == provider_name:
                             self.register_tool(tool_id, tool_info)
+            # Berry 始终出现在模型列表，便于和 Seedance 切换；缺少 key 时在生成阶段报错
+            if "generate_video_by_berry" not in self.tools:
+                self.register_tool(
+                    "generate_video_by_berry",
+                    TOOL_MAPPING["generate_video_by_berry"],
+                )
             # 生图仅使用 Agnes，不再注册 ComfyUI / Replicate 等其它图像工具
         except Exception as e:
             print(f"❌ Failed to initialize tool service: {e}")

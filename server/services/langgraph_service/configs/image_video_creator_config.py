@@ -40,7 +40,7 @@ system_prompt = """
 
 **视频参数：**
 - 时长 ≤ 15秒，默认 duration=15（可选 5、10、15）
-- 分辨率默认 resolution="1080p"；仅当 <quantity>2</quantity> 求速度时可用 480p
+- 分辨率默认 resolution="480p"。用户明确要求更高清晰度时才用 720p 或 1080p
 - **比例强制**：必须读取用户消息中的 <aspect_ratio>...</aspect_ratio>，原样传入 aspect_ratio 与 ratio（支持 3:2、9:16 等）。禁止擅自改成 16:9
 - **数量强制（极其重要）**：
   - 用户消息含 `<quantity>1</quantity>` 或未写 quantity → **只调用 1 次** `generate_video_by_agnes`，且 **quantity=1**，只生成 1 个视频
@@ -62,6 +62,31 @@ system_prompt = """
 """
 
 
+def _video_prompt_for_tools(tool_list: List[ToolInfoJson]) -> str:
+    """自动或同时勾选时仍默认 Seedance。只勾选 Berry 时改走 Berry，不改 Seedance 文案本身。"""
+    video_ids = {
+        tool.get("id")
+        for tool in tool_list
+        if tool.get("type") == "video"
+    }
+    berry_only = (
+        "generate_video_by_berry" in video_ids
+        and "generate_video_by_agnes" not in video_ids
+    )
+    if berry_only:
+        prompt = system_prompt.replace(
+            "generate_video_by_agnes", "generate_video_by_berry"
+        )
+        return prompt.replace("Seedance 2.0", "Berry 1.0")
+    if "generate_video_by_berry" in video_ids:
+        return (
+            system_prompt
+            + "\n\n若用户明确要求 Berry 1.0，改为调用 generate_video_by_berry。"
+            "未点名时仍只调用 generate_video_by_agnes。"
+        )
+    return system_prompt
+
+
 class ImageVideoCreatorAgentConfig(BaseAgentConfig):
     def __init__(self, tool_list: List[ToolInfoJson]) -> None:
         creator_tools = [
@@ -72,6 +97,6 @@ class ImageVideoCreatorAgentConfig(BaseAgentConfig):
         super().__init__(
             name='image_video_creator',
             tools=creator_tools,
-            system_prompt=system_prompt,
+            system_prompt=_video_prompt_for_tools(creator_tools),
             handoffs=handoffs
         )

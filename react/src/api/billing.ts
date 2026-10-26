@@ -36,6 +36,30 @@ export interface OrderStatusResponse {
   balance: string
 }
 
+export async function consumeGenerationCredits(
+  kind: 'image' | 'video',
+  model = '',
+  quantity = 1
+): Promise<{
+  kind: 'image' | 'video'
+  model: string
+  quantity: number
+  cost: number
+  reason: string
+  balance: string
+}> {
+  const response = await authenticatedFetch('/api/billing/consume', {
+    method: 'POST',
+    body: JSON.stringify({ kind, model, quantity }),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const detail = typeof data.detail === 'string' ? data.detail : '扣减积分失败'
+    throw new Error(detail)
+  }
+  return data
+}
+
 export async function getBalance(): Promise<BalanceResponse> {
   const response = await authenticatedFetch('/api/billing/getBalance')
   if (!response.ok) {

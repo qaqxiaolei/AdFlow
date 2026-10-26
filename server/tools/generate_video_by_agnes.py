@@ -211,8 +211,8 @@ class GenerateVideoByAgnesInputSchema(BaseModel):
         description="必填。视频生成提示词，描述希望在视频中看到的画面内容，可使用中文或英文。"
     )
     resolution: str = Field(
-        default="1080p",
-        description="可选。视频分辨率。默认 1080p 以提升画质；生成 2 条视频求速度时可用 480p。可选值：480p、1080p。"
+        default="480p",
+        description="可选。视频分辨率。默认 480p。用户明确要求更高清晰度时再用 1080p。可选值：480p、1080p。"
     )
     duration: int = Field(
         default=15,
@@ -244,12 +244,14 @@ async def generate_video_by_agnes(
     prompt: str,
     config: RunnableConfig,
     tool_call_id: Annotated[str, InjectedToolCallId],
-    resolution: str = "1080p",
+    resolution: str = "480p",
     duration: int = 15,
     aspect_ratio: str = "9:16",
     ratio: str = "9:16",
     input_images: Any = None,
     quantity: int = 1,
+    video_model: str = VOLCES_VIDEO_MODEL_DEFAULT,
+    video_provider: str = "volces",
 ) -> str:
     # 比例/数量必须在 strip 标签前从用户原文解析，否则会丢失前端传入的 9:16
     actual_ratio = _resolve_aspect_ratio(prompt, aspect_ratio, ratio, config)
@@ -353,8 +355,8 @@ async def generate_video_by_agnes(
                     resolution=resolution,
                     duration=duration,
                     aspect_ratio=actual_ratio,
-                    model=VOLCES_VIDEO_MODEL_DEFAULT,
-                    provider="volces",
+                    model=video_model,
+                    provider=video_provider,
                     tool_call_id=f"{tool_call_id}_{i}",
                     config=config,
                     input_images=processed_input_images,
@@ -389,8 +391,8 @@ async def generate_video_by_agnes(
         resolution=resolution,
         duration=duration,
         aspect_ratio=actual_ratio,
-        model=VOLCES_VIDEO_MODEL_DEFAULT,
-        provider="volces",
+        model=video_model,
+        provider=video_provider,
         tool_call_id=tool_call_id,
         config=config,
         input_images=processed_input_images,
@@ -399,4 +401,36 @@ async def generate_video_by_agnes(
     )
 
 
-__all__ = ["generate_video_by_agnes"]
+__all__ = ["generate_video_by_agnes", "run_video_generation"]
+
+
+async def run_video_generation(
+    prompt: str,
+    config: RunnableConfig,
+    tool_call_id: str,
+    resolution: str = "480p",
+    duration: int = 15,
+    aspect_ratio: str = "9:16",
+    ratio: str = "9:16",
+    input_images: Any = None,
+    quantity: int = 1,
+    video_model: str = VOLCES_VIDEO_MODEL_DEFAULT,
+    video_provider: str = "volces",
+) -> str:
+    """供其它视频工具复用同一套提示词增强与数量逻辑，不改变 Seedance 默认路径。"""
+    raw = getattr(generate_video_by_agnes, "coroutine", None)
+    if raw is None:
+        raise RuntimeError("generate_video_by_agnes 未暴露 coroutine")
+    return await raw(
+        prompt=prompt,
+        config=config,
+        tool_call_id=tool_call_id,
+        resolution=resolution,
+        duration=duration,
+        aspect_ratio=aspect_ratio,
+        ratio=ratio,
+        input_images=input_images,
+        quantity=quantity,
+        video_model=video_model,
+        video_provider=video_provider,
+    )

@@ -43,7 +43,7 @@ async def generate_image_with_provider(
 ) -> str:
     """
     通用图像生成函数，支持不同的模型和提供商。
-    登录用户每成功生成 1 张图扣 IMAGE_CREDIT_COST 积分（默认 1）。
+    积分在前端发送时通过 POST /api/billing/consume 扣除，这里不再扣费。
     """
 
     provider_instance = IMAGE_PROVIDERS.get(provider)
@@ -75,50 +75,19 @@ async def generate_image_with_provider(
         "input_images": input_images or [],
     }
 
-    credits_deducted = False
-    try:
-        if user_id:
-            from services.auth_service import IMAGE_CREDIT_COST
-            from services.db_service import db_service
+    mime_type, width, height, filename = await provider_instance.generate(
+        prompt=enhanced_prompt,
+        model=model,
+        aspect_ratio=aspect_ratio,
+        input_images=processed_input_images,
+        metadata=metadata,
+    )
 
-            await db_service.adjust_user_credits(
-                user_id, -IMAGE_CREDIT_COST, f"image:{model}"
-            )
-            credits_deducted = True
-            print(
-                f"💳 Deducted {IMAGE_CREDIT_COST} credits from user {user_id} (image)"
-            )
+    image_url = await save_image_to_canvas(
+        session_id, canvas_id, filename, mime_type, width, height
+    )
 
-        # Generate image using the selected provider
-        mime_type, width, height, filename = await provider_instance.generate(
-            prompt=enhanced_prompt,
-            model=model,
-            aspect_ratio=aspect_ratio,
-            input_images=processed_input_images,
-            metadata=metadata,
-        )
-
-        # Save image to canvas
-        image_url = await save_image_to_canvas(
-            session_id, canvas_id, filename, mime_type, width, height
-        )
-
-        return (
-            f"image generated successfully "
-            f"![image_id: {filename}]({image_url})"
-        )
-    except Exception:
-        if credits_deducted and user_id:
-            try:
-                from services.auth_service import IMAGE_CREDIT_COST
-                from services.db_service import db_service
-
-                await db_service.adjust_user_credits(
-                    user_id, IMAGE_CREDIT_COST, f"image_refund:{model}"
-                )
-                print(
-                    f"💳 Refunded {IMAGE_CREDIT_COST} credits to user {user_id} (image)"
-                )
-            except Exception as refund_err:
-                print(f"💳 Image refund failed: {refund_err}")
-        raise
+    return (
+        f"image generated successfully "
+        f"![image_id: {filename}]({image_url})"
+    )

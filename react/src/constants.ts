@@ -40,6 +40,10 @@ export const PROVIDER_NAME_MAPPING: {
     name: 'Volces',
     icon: 'https://portal.volccdn.com/obj/volcfe/misc/favicon.png',
   },
+  mulerouter: {
+    name: 'MuleRouter',
+    icon: 'https://www.mulerouter.ai/favicon.ico',
+  },
   comfyui: {
     name: 'ComfyUI',
     icon: 'https://framerusercontent.com/images/3cNQMWKzIhIrQ5KErBm7dSmbd2w.png',

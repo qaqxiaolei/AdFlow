@@ -45,6 +45,13 @@ DEFAULT_PROVIDERS_CONFIG: AppConfig = {
         'url': 'https://ark.cn-beijing.volces.com/api/v3',
         'api_key': 'ark-2ccdfc6f-7bed-4177-a1ff-5cdd3c3aefdd-39e2b',
     },
+    'mulerouter': {
+        'models': {
+            'berry-1.0': {'type': 'video'},
+        },
+        'url': 'https://api.mulerouter.ai',
+        'api_key': os.environ.get('MULEROUTER_API_KEY', ''),
+    },
     'comfyui': {
         'models': {},
         'url': 'http://127.0.0.1:8188',
